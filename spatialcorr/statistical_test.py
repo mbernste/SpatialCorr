@@ -245,14 +245,15 @@ def plot_mvn(mean, covar, X, the_x, title=''):
 def _worker_between(
         worker_id,
         global_t_nulls,
+        spotwise_t_nulls,
         df_filt,
         perms,
         kernel_matrix,
         ct_to_indices,
-        #alt_corrs_filt,
         null_corrs_filt,
         keep_indices,
-        verbose=10
+        verbose=10,
+        compute_spotwise_pvals=False
     ):
     """
     This function computes the test statistic on a chunk of permutations when
@@ -275,17 +276,21 @@ def _worker_between(
         )
         # Record the test statistic for this null sample
         global_t_nulls.append(perm_ll)
+        if compute_spotwise_pvals:
+            spotwise_t_nulls.append(perm_spot_lls)
 
 
 def _worker_within(
         worker_id,
         global_t_nulls,
+        spotwise_t_nulls,
         df_filt,
         perms,
         kernel_matrix,
         null_corrs_filt,
         keep_indices,
-        verbose=10
+        verbose=10,
+        compute_spotwise_pvals=False
     ):
     """
     This function computes the test statistic on a chunk of permutations when
@@ -306,6 +311,8 @@ def _worker_within(
         )
         # Record the test statistic for this null sample
         global_t_nulls.append(perm_ll)
+        if compute_spotwise_pvals:
+            spotwise_t_nulls.append(perm_spot_lls)
 
 
 def _adjust_covs_from_corrs(covs, corrs):
@@ -535,7 +542,8 @@ def _between_groups_test(
         keep_indices=None,
         use_sequential=True, 
         sequential_n_greater=20, 
-        sequential_bail_out=10000
+        sequential_bail_out=10000,
+        compute_spotwise_pvals=False
     ):
     if keep_indices is None:
         keep_indices = np.arange(kernel_matrix.shape[0])
@@ -592,7 +600,7 @@ def _between_groups_test(
 
             manager = Manager()
             t_nulls = manager.list()
-            all_perm_spot_lls = None
+            spotwise_t_nulls = manager.list()
 
             chunk_size = math.ceil(len(perms) / n_procs)
             if verbose > 1:
@@ -605,6 +613,7 @@ def _between_groups_test(
                     args=(
                         worker_id,
                         t_nulls,
+                        spotwise_t_nulls,
                         df_filt,
                         chunk,
                         kernel_matrix,
@@ -612,7 +621,8 @@ def _between_groups_test(
                         #alt_corrs_filt,
                         null_corrs_filt,
                         keep_indices,
-                        verbose
+                        verbose,
+                        compute_spotwise_pvals
                     )
                 )
                 jobs.append(p)
@@ -623,8 +633,7 @@ def _between_groups_test(
                 p.join()
         else:
             t_nulls = []
-            all_perm_spot_lls = None
-            #all_perm_spot_lls = []
+            spotwise_t_nulls = []
             for perm_i, perm in enumerate(perms):
                 if verbose and perm_i % 10 == 0:
                     print('Computing ratio statistic for permutation {}/{}'.format(perm_i+1, len(perms)))
@@ -642,6 +651,8 @@ def _between_groups_test(
 
                 # Record the test statistic for this null sample
                 t_nulls.append(perm_ll)
+                if compute_spotwise_pvals:
+                    spotwise_t_nulls.append(perm_spot_lls)
 
         for t_null in t_nulls:
             all_t_nulls.append(t_null)
@@ -658,7 +669,15 @@ def _between_groups_test(
                 print(f"Hit maximum permutations threshold of {sequential_n_greater}. P-value = {p_val}")
                 stop_monte_carlo = True
                 break
-    return p_val, t_obs, t_nulls, obs_spot_lls
+        # Create an NxP array where N is number of spots
+        # P is number of null samples where each row stores
+        # the null spotwise statistics for each spot
+        spotwise_t_nulls = np.array(spotwise_t_nulls).T
+        spot_p_vals = []
+        for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, spotwise_t_nulls):
+            spot_p_val = len([x for x in null_spot_lls if x > obs_spot_ll]) / len(null_spot_lls)
+            spot_p_vals.append(spot_p_val)
+    return p_val, t_obs, t_nulls, obs_spot_lls, spot_p_vals
 
 
 def _within_groups_test(
@@ -670,7 +689,10 @@ def _within_groups_test(
         n_procs=1,
         ct_to_indices=None,
         keep_indices=None,
-        use_sequential=True, sequential_n_greater=20, sequential_bail_out=10000
+        use_sequential=True, 
+        sequential_n_greater=20, 
+        sequential_bail_out=10000,
+        compute_spotwise_pvals=False
     ):
     """
     t_nulls, t_obs, p_val, spot_obs_ll_diffs, spot_perm_ll_diffs
@@ -746,7 +768,7 @@ def _within_groups_test(
 
             manager = Manager()
             t_nulls = manager.list()
-            all_perm_spot_lls = None
+            spotwise_t_nulls = manager.list()
 
             chunk_size = math.ceil(len(perms) / n_procs)
             if verbose > 1:
@@ -759,12 +781,14 @@ def _within_groups_test(
                     args=(
                         worker_id,
                         t_nulls,
+                        spotwise_t_nulls,
                         df_filt,
                         chunk,
                         kernel_matrix,
                         null_corrs_filt,
                         keep_indices,
-                        verbose
+                        verbose,
+                        compute_spotwise_pvals
                     )
                 )
                 jobs.append(p)
@@ -775,8 +799,7 @@ def _within_groups_test(
                 p.join()
         else:
             t_nulls = []
-            all_perm_spot_lls = None
-            #all_perm_spot_lls = []
+            spotwise_t_nulls = []
             for perm_i, perm in enumerate(perms):
                 if verbose > 1 and perm_i % 10 == 0:
                     print('Computing ratio statistic for permutation {}/{}'.format(perm_i+1, len(perms)))
@@ -792,6 +815,8 @@ def _within_groups_test(
 
                 # Record the test statistic for this null sample
                 t_nulls.append(perm_ll)
+                if compute_spotwise_pvals:
+                    spotwise_t_nulls.append(perm_spot_lls)
 
         for t_null in t_nulls:
             all_t_nulls.append(t_null)
@@ -809,8 +834,17 @@ def _within_groups_test(
                 if verbose > 0:
                     print(f"Hit maximum permutations threshold of {sequential_n_greater}. P-value = {p_val}")
                 stop_monte_carlo = True
-                break   
-    return p_val, t_obs, t_nulls, obs_spot_lls
+                break
+
+    # Create an NxP array where N is number of spots
+    # P is number of null samples where each row stores
+    # the null spotwise statistics for each spot
+    spotwise_t_nulls = np.array(spotwise_t_nulls).T
+    spot_p_vals = []
+    for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, spotwise_t_nulls):
+        spot_p_val = len([x for x in null_spot_lls if x > obs_spot_ll]) / len(null_spot_lls) 
+        spot_p_vals.append(spot_p_val)
+    return p_val, t_obs, t_nulls, obs_spot_lls, spot_p_vals
 
 
 def run_test(
@@ -871,7 +905,8 @@ def run_test(
             ct_to_indices,
             verbose=verbose,
             n_procs=n_procs,
-            keep_indices=keep_inds
+            keep_indices=keep_inds,
+            compute_spotwise_pvals=compute_spotwise_pvals
         )
     else:
         p_val, t_obs, t_nulls, obs_spot_lls = _within_groups_test(
@@ -882,9 +917,10 @@ def run_test(
             ct_to_indices=ct_to_indices,
             verbose=verbose,
             n_procs=n_procs,
-            keep_indices=keep_inds
+            keep_indices=keep_inds,
+            compute_spotwise_pvals=compute_spotwise_pvals
         )
-    return p_val, t_obs, t_nulls, keep_inds
+    return p_val, t_obs, t_nulls, keep_inds, spot_p_vals
 
 
 
@@ -939,7 +975,8 @@ def log_likelihood_ratio_test(
             ct_to_indices,
             verbose=verbose,
             n_procs=n_procs,
-            keep_indices=keep_inds
+            keep_indices=keep_inds,
+            compute_spotwise_pvals=compute_spotwise_pvals
         )
     else:
         p_val, t_obs, t_nulls, obs_spot_lls = _within_groups_test(
@@ -950,10 +987,11 @@ def log_likelihood_ratio_test(
             ct_to_indices=ct_to_indices,
             verbose=verbose,
             n_procs=n_procs,
-            keep_indices=keep_inds
+            keep_indices=keep_inds,
+            compute_spotwise_pvals=compute_spotwise_pvals
         )
 
-    return p_val, t_obs, t_nulls
+    return p_val, spot_p_vals, t_obs, t_nulls
 
 
 def chunks(lst, n):
