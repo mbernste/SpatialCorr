@@ -844,7 +844,7 @@ def _within_groups_test(
     for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, spotwise_t_nulls):
         spot_p_val = len([x for x in null_spot_lls if x > obs_spot_ll]) / len(null_spot_lls) 
         spot_p_vals.append(spot_p_val)
-    return p_val, t_obs, t_nulls, obs_spot_lls, spot_p_vals
+    return p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals
 
 
 def run_test(
@@ -857,7 +857,8 @@ def run_test(
         col_key='col',
         verbose=1,
         n_procs=1,
-        test_between_conds=False
+        test_between_conds=False,
+        compute_spotwise_pvals=False
     ):
     # Extract expression data
     expr = np.array([
@@ -898,7 +899,7 @@ def run_test(
 
     if test_between_conds:
         assert condition
-        p_val, t_obs, t_nulls, obs_spot_lls = _between_groups_test(
+        p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals = _between_groups_test(
             expr,
             adata.obs,
             kernel_matrix,
@@ -909,7 +910,7 @@ def run_test(
             compute_spotwise_pvals=compute_spotwise_pvals
         )
     else:
-        p_val, t_obs, t_nulls, obs_spot_lls = _within_groups_test(
+        p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals = _within_groups_test(
             expr,
             adata.obs,
             kernel_matrix,
@@ -920,7 +921,7 @@ def run_test(
             keep_indices=keep_inds,
             compute_spotwise_pvals=compute_spotwise_pvals
         )
-    return p_val, t_obs, t_nulls, keep_inds, spot_p_vals
+    return p_val, t_obs, t_nulls, keep_inds, spotwise_t_nulls, spot_p_vals
 
 
 
