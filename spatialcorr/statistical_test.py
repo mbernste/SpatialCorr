@@ -921,7 +921,7 @@ def run_test(
             keep_indices=keep_inds,
             compute_spotwise_pvals=compute_spotwise_pvals
         )
-    return p_val, t_obs, t_nulls, keep_inds, spotwise_t_nulls, spot_p_vals
+    return p_val, t_obs, t_nulls, keep_inds, obs_spot_lls, spotwise_t_nulls, spot_p_vals
 
 
 
