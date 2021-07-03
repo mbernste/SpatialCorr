@@ -722,6 +722,8 @@ def _within_groups_test(
         for ct, indices in ct_to_indices.items()
     }
 
+    print(ct_to_corr) # TODO REMOVE!!!!!!!
+
     # Check each cluster to see if its covariance matrix is singular
     for ct, corr in ct_to_corr.items():
         if np.isnan(np.sum(corr)):
