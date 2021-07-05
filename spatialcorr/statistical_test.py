@@ -221,7 +221,7 @@ def plot_and_run_cov(
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 import seaborn as sns
-import log_likelihood_ratio_test_plot as llrtp
+#import log_likelihood_ratio_test_plot as llrtp
 def plot_mvn(mean, covar, X, the_x, title=''):
     color_iter = llrtp.PALETTE
     fig, ax = plt.subplots(1,1, figsize=(5,5))
@@ -721,8 +721,6 @@ def _within_groups_test(
         ct: np.corrcoef(expr[:,indices])
         for ct, indices in ct_to_indices.items()
     }
-
-    print(ct_to_corr) # TODO REMOVE!!!!!!!
 
     # Check each cluster to see if its covariance matrix is singular
     for ct, corr in ct_to_corr.items():
