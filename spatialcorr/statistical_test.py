@@ -677,7 +677,8 @@ def _between_groups_test(
         for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, spotwise_t_nulls):
             spot_p_val = len([x for x in null_spot_lls if x > obs_spot_ll]) / len(null_spot_lls)
             spot_p_vals.append(spot_p_val)
-    return p_val, t_obs, t_nulls, obs_spot_lls, spot_p_vals
+
+    return p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals
 
 
 def _within_groups_test(
