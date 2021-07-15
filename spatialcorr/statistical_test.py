@@ -134,89 +134,6 @@ def _permute_expression_cond_cell_type(X, ct_to_indices, n_perms):
         perms[:,indices,:] = ct_perms
     return perms
 
-   
-def plot_and_run_cov(
-        gene_1, 
-        gene_2, 
-        kernel_matrix,
-        expr_1, 
-        expr_2, 
-        df, 
-        ct_to_indices=None,
-        dot_size=30,
-        corr_cmap='RdBu_r',
-        plot=True
-    ):
-    cov_mats = kernel_estimation(
-        kernel_matrix,
-        np.array([expr_1, expr_2])
-        #ct_to_indices=ct_to_indices
-    )
-    covs = [
-        c[0][1]
-        for c in cov_mats
-    ]
-    corrs = [
-        c[0][1] / np.sqrt(c[0][0] * c[1][1])
-        for c in cov_mats
-    ]
-
-    vars_1 = [
-        c[0][0]
-        for c in cov_mats
-    ]
-    vars_2 = [
-        c[1][1]
-        for c in cov_mats
-    ]
-
-    
-    df_dynamic_cov = pd.DataFrame(
-        data={'covariance': covs},
-        index=df.index
-    )
-    df_dynamic_corr = pd.DataFrame(
-        data={'correlation': corrs},
-        index=df.index
-    )
-    df_dynamic_cov = df.join(df_dynamic_cov)
-    df_dynamic_corr = df.join(df_dynamic_corr)
-   
-    if plot:
-        figure, axarr = plt.subplots(
-            2, 
-            2,
-            figsize = (10,10)
-        ) 
-        
-        y = -1 * np.array(df['row'])
-        x = df['col']
-        color = expr_1
-        axarr[0][0].scatter(x,y,c=color, cmap='viridis', s=dot_size)
-        axarr[0][0].set_title('{} Expression'.format(gene_1))
-        
-        y = -1 * np.array(df['row'])
-        x = df['col']
-        color = expr_2
-        axarr[0][1].scatter(x,y,c=color, cmap='viridis', s=dot_size)
-        axarr[0][1].set_title('{} Expression'.format(gene_2))
-        
-        y = -1 * np.array(df_dynamic_cov['row'])
-        x = df_dynamic_cov['col']
-        color = df_dynamic_cov['covariance'] 
-        axarr[1][0].scatter(x,y,c=color, cmap='viridis', s=dot_size)
-        axarr[1][0].set_title('Estimated Covariance')
-        
-        y = -1 * np.array(df_dynamic_corr['row'])
-        x = df_dynamic_cov['col']
-        color = df_dynamic_corr['correlation'] 
-        im = axarr[1][1].scatter(x,y,c=color, cmap=corr_cmap, s=dot_size, vmin=-1, vmax=1)
-        figure.colorbar(im, ax=axarr[1][1], ticks=[-1, -0.75, -0.5, -0.25, 0., 0.25, 0.5, 0.75, 1])
-        axarr[1][1].set_title('Estimated Correlation')
-    
-    return corrs, covs, vars_1, vars_2
-
-
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
@@ -859,7 +776,8 @@ def run_test(
         verbose=1,
         n_procs=1,
         test_between_conds=False,
-        compute_spotwise_pvals=False
+        compute_spotwise_pvals=False,
+        max_perms=10000
     ):
     # Extract expression data
     expr = np.array([
@@ -908,7 +826,8 @@ def run_test(
             verbose=verbose,
             n_procs=n_procs,
             keep_indices=keep_inds,
-            compute_spotwise_pvals=compute_spotwise_pvals
+            compute_spotwise_pvals=compute_spotwise_pvals,
+            sequential_bail_out=max_perms
         )
     else:
         p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals = _within_groups_test(
@@ -920,80 +839,84 @@ def run_test(
             verbose=verbose,
             n_procs=n_procs,
             keep_indices=keep_inds,
-            compute_spotwise_pvals=compute_spotwise_pvals
+            compute_spotwise_pvals=compute_spotwise_pvals,
+            sequential_bail_out=max_perms
         )
     return p_val, t_obs, t_nulls, keep_inds, obs_spot_lls, spotwise_t_nulls, spot_p_vals
 
 
 
-def log_likelihood_ratio_test(
-        expr,
-        df,
-        sigma,
-        cell_type_key='cluster',
-        cond_cell_type=False,
-        contrib_thresh=5,
-        x_col='col',
-        y_col='row',
-        verbose=10,
-        n_procs=1,
-        between_cell_types=False
-    ):
-    # Compute kernel matrix
-    kernel_matrix = _compute_kernel_matrix(
-        df, 
-        sigma=sigma, 
-        cell_type_key=cell_type_key,
-        condition_on_cell_type=cond_cell_type,
-        y_col=y_col,
-        x_col=x_col
-    )
-
-    # Filter spots with too little contribution 
-    # from neighbors
-    contrib = np.sum(kernel_matrix, axis=1)
-    keep_inds = [
-        i
-        for i, c in enumerate(contrib)
-        if c >= contrib_thresh
-    ]
-    if verbose >= 1:
-        print('Kept {}/{} spots.'.format(len(keep_inds), len(df)))
-
-    # Map each cell type to its indices
-    if cond_cell_type:
-        ct_to_indices = defaultdict(lambda: [])
-        for i, ct in enumerate(df[cell_type_key]):
-            ct_to_indices[ct].append(i)
-    else:
-        ct_to_indices = {'all': np.arange(len(df))}
-
-    if between_cell_types:
-        assert cond_cell_type
-        p_val, t_obs, t_nulls, obs_spot_lls = _between_groups_test(
-            expr,
-            df,
-            kernel_matrix,
-            ct_to_indices,
-            verbose=verbose,
-            n_procs=n_procs,
-            keep_indices=keep_inds,
-            compute_spotwise_pvals=compute_spotwise_pvals
-        )
-    else:
-        p_val, t_obs, t_nulls, obs_spot_lls = _within_groups_test(
-            expr,
-            df,
-            kernel_matrix,
-            plot_lls=False,
-            ct_to_indices=ct_to_indices,
-            verbose=verbose,
-            n_procs=n_procs,
-            keep_indices=keep_inds,
-            compute_spotwise_pvals=compute_spotwise_pvals
-        )
-
-    return p_val, spot_p_vals, t_obs, t_nulls
+#def log_likelihood_ratio_test(
+#        expr,
+#        df,
+#        sigma,
+#        cell_type_key='cluster',
+#        cond_cell_type=False,
+#        contrib_thresh=5,
+#        x_col='col',
+#        y_col='row',
+#        verbose=10,
+#        n_procs=1,
+#        between_cell_types=False,
+#        max_perms=10000
+#    ):
+#    # Compute kernel matrix
+#    kernel_matrix = _compute_kernel_matrix(
+#        df, 
+#        sigma=sigma, 
+#        cell_type_key=cell_type_key,
+#        condition_on_cell_type=cond_cell_type,
+#        y_col=y_col,
+#        x_col=x_col
+#    )
+#
+#    # Filter spots with too little contribution 
+#    # from neighbors
+#    contrib = np.sum(kernel_matrix, axis=1)
+#    keep_inds = [
+#        i
+#        for i, c in enumerate(contrib)
+#        if c >= contrib_thresh
+#    ]
+#    if verbose >= 1:
+#        print('Kept {}/{} spots.'.format(len(keep_inds), len(df)))
+#
+#    # Map each cell type to its indices
+#    if cond_cell_type:
+#        ct_to_indices = defaultdict(lambda: [])
+#        for i, ct in enumerate(df[cell_type_key]):
+#            ct_to_indices[ct].append(i)
+#    else:
+#        ct_to_indices = {'all': np.arange(len(df))}
+#
+#    if between_cell_types:
+#        assert cond_cell_type
+#        p_val, t_obs, t_nulls, obs_spot_lls = _between_groups_test(
+#            expr,
+#            df,
+#            kernel_matrix,
+#            ct_to_indices,
+#            verbose=verbose,
+#            n_procs=n_procs,
+#            keep_indices=keep_inds,
+#            compute_spotwise_pvals=compute_spotwise_pvals,
+#            sequential_bail_out=max_perms
+#        )
+#    else:
+#        p_val, t_obs, t_nulls, obs_spot_lls = _within_groups_test(
+#            expr,
+#            df,
+#            kernel_matrix,
+#            plot_lls=False,
+#            ct_to_indices=ct_to_indices,
+#            verbose=verbose,
+#            n_procs=n_procs,
+#            keep_indices=keep_inds,
+#            compute_spotwise_pvals=compute_spotwise_pvals,
+#            sequential_bail_out=max_perms
+#        )
+#
+#    return p_val, spot_p_vals, t_obs, t_nulls
 
 
 def chunks(lst, n):
