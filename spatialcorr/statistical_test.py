@@ -460,7 +460,8 @@ def _between_groups_test(
         use_sequential=True, 
         sequential_n_greater=20, 
         sequential_bail_out=10000,
-        compute_spotwise_pvals=False
+        compute_spotwise_pvals=False,
+        standardize_var=False
     ):
     if keep_indices is None:
         keep_indices = np.arange(kernel_matrix.shape[0])
@@ -472,6 +473,14 @@ def _between_groups_test(
     }
     for ct, indices in ct_to_indices.items():
         expr[:,indices] = (expr[:,indices].T - np.full(expr[:,indices].T.shape, ct_to_means[ct])).T
+
+    if standardize_var:
+        ct_to_std = {
+            ct: np.std(expr[:,indices], axis=1)
+            for ct, indices in ct_to_indices.items()
+        }
+        for ct, indices in ct_to_indices.items():
+            expr[:,indices] = (expr[:,indices].T / np.full(expr[:,indices].T.shape, ct_to_mtd[ct])).T
 
     # Compute the null correlation matrix for each spot. This is
     # a constant correlation matrix
@@ -777,6 +786,7 @@ def run_test(
         n_procs=1,
         test_between_conds=False,
         compute_spotwise_pvals=False,
+        standardize_var=False,
         max_perms=10000
     ):
     # Extract expression data
@@ -827,7 +837,8 @@ def run_test(
             n_procs=n_procs,
             keep_indices=keep_inds,
             compute_spotwise_pvals=compute_spotwise_pvals,
-            sequential_bail_out=max_perms
+            sequential_bail_out=max_perms,
+            standardize_var=standardize_var
         )
     else:
         p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals = _within_groups_test(
