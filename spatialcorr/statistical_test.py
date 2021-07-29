@@ -480,7 +480,7 @@ def _between_groups_test(
             for ct, indices in ct_to_indices.items()
         }
         for ct, indices in ct_to_indices.items():
-            expr[:,indices] = (expr[:,indices].T / np.full(expr[:,indices].T.shape, ct_to_mtd[ct])).T
+            expr[:,indices] = (expr[:,indices].T / np.full(expr[:,indices].T.shape, ct_to_std[ct])).T
 
     # Compute the null correlation matrix for each spot. This is
     # a constant correlation matrix
