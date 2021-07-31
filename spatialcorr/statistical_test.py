@@ -511,7 +511,7 @@ def _between_groups_test(
 
     stop_monte_carlo = False # Whether to stop the sequential Monte Carlo calculations
     n_nulls_great = 0        # Number of null statistics greater than the observed
-    PERM_SIZE = 50           # Every batch, we compute a set number of permutations
+    PERM_SIZE = 100           # Every batch, we compute a set number of permutations
     all_t_nulls = []
     while not stop_monte_carlo:
         # Compute permutations conditioned on cell type
@@ -680,7 +680,7 @@ def _within_groups_test(
 
     stop_monte_carlo = False # Whether to stop the sequential Monte Carlo calculations
     n_nulls_great = 0        # Number of null statistics greater than the observed
-    PERM_SIZE = 50           # Every batch, we compute a set number of permutations
+    PERM_SIZE = 100          # Every batch, we compute a set number of permutations
     all_t_nulls = []
     while not stop_monte_carlo:
         # Compute permutations conditioned on cell type
@@ -789,6 +789,7 @@ def run_test(
         standardize_var=False,
         max_perms=10000
     ):
+
     # Extract expression data
     expr = np.array([
         adata.obs_vector(gene)
