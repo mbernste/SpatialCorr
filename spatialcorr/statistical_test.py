@@ -461,7 +461,9 @@ def _between_groups_test(
         sequential_n_greater=20, 
         sequential_bail_out=10000,
         compute_spotwise_pvals=False,
-        standardize_var=False
+        standardize_var=False,
+        mc_pvals=True,
+        spot_to_neighbors=None
     ):
     if keep_indices is None:
         keep_indices = np.arange(kernel_matrix.shape[0])
@@ -580,31 +582,69 @@ def _between_groups_test(
                 if compute_spotwise_pvals:
                     spotwise_t_nulls.append(perm_spot_lls)
 
-        for t_null in t_nulls:
-            all_t_nulls.append(t_null)
-            if t_null > t_obs:
-                n_nulls_great += 1
-            if n_nulls_great == sequential_n_greater:
-                hit_threshold = True
-                p_val = n_nulls_great / len(all_t_nulls)
-                print(f"Number of nulls > obs has hit threshold of {sequential_n_greater}. Total permutations used: {len(all_t_nulls)}. P-value = {p_val}")
-                stop_monte_carlo = True
-                break
-            if len(all_t_nulls) >= (sequential_bail_out-1):
-                p_val = (n_nulls_great + 1) / sequential_bail_out
-                print(f"Hit maximum permutations threshold of {sequential_n_greater}. P-value = {p_val}")
-                stop_monte_carlo = True
-                break
-        # Create an NxP array where N is number of spots
-        # P is number of null samples where each row stores
-        # the null spotwise statistics for each spot
-        spotwise_t_nulls = np.array(spotwise_t_nulls).T
+        if mc_pvals:
+            for t_null in t_nulls:
+                all_t_nulls.append(t_null)
+                if t_null > t_obs:
+                    n_nulls_great += 1
+                if n_nulls_great == sequential_n_greater:
+                    hit_threshold = True
+                    p_val = n_nulls_great / len(all_t_nulls)
+                    print(f"Number of nulls > obs has hit threshold of {sequential_n_greater}. Total permutations used: {len(all_t_nulls)}. P-value = {p_val}")
+                    stop_monte_carlo = True
+                    break
+                if len(all_t_nulls) >= (sequential_bail_out-1):
+                    p_val = (n_nulls_great + 1) / sequential_bail_out
+                    print(f"Hit maximum permutations threshold of {sequential_n_greater}. P-value = {p_val}")
+                    stop_monte_carlo = True
+                    break
+        else:
+            for t_null in t_nulls:
+                all_t_nulls.append(t_null)
+                if t_null > t_obs:
+                    n_nulls_great += 1
+                if len(all_t_nulls) >= (sequential_bail_out-1):
+                    p_val = (n_nulls_great + 1) / sequential_bail_out
+                    stop_monte_carlo = True
+                    break
+
+    # Create an NxP array where N is number of spots
+    # P is number of null samples where each row stores
+    # the null spotwise statistics for each spot.
+    # Because we may have more permutations than we used (due
+    # to computation of Monte-Carlo p-values), we restrict to 
+    # only number of permutations used.
+    spotwise_t_nulls = np.array(spotwise_t_nulls)[:len(all_t_nulls),:]
+    spotwise_t_nulls = spotwise_t_nulls.T
+    spot_neigh_t_nulls = []
+    obs_neight_lls = []
+    if spot_to_neighbors:
+        spot_to_index = {
+            spot: s_i
+            for s_i, spot in enumerate(df_filt.index)
+        }
+        for spot in df_filt.index:
+            neighs = set(spot_to_neighbors[spot]) | set([spot])
+            neigh_inds = [spot_to_index[x] for x in neighs if x in spot_to_index]
+            obs_neight_lls.append(np.sum(np.array(obs_spot_lls)[neigh_inds]))
+            spot_neigh_t_nulls.append(np.sum(spotwise_t_nulls[neigh_inds,:], axis=0))
+        spot_neigh_t_nulls = np.array(spot_neigh_t_nulls)
+        print("Shape of neighborhood nulls matrix: ", spot_neigh_t_nulls.shape)
+        assert spot_neigh_t_nulls.shape == spotwise_t_nulls.shape
+
+        # Compute spot-wise p-values using neighborhood-summed log-likelihoods at each spot
+        spot_p_vals = []
+        for obs_spot_ll, null_spot_lls in zip(obs_neight_lls, spot_neigh_t_nulls):
+            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / len(null_spot_lls)
+            spot_p_vals.append(spot_p_val)
+    else:
         spot_p_vals = []
         for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, spotwise_t_nulls):
-            spot_p_val = len([x for x in null_spot_lls if x > obs_spot_ll]) / len(null_spot_lls)
+            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / len(null_spot_lls)
             spot_p_vals.append(spot_p_val)
-
     return p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals
+
+
 
 
 def _within_groups_test(
@@ -619,7 +659,9 @@ def _within_groups_test(
         use_sequential=True, 
         sequential_n_greater=20, 
         sequential_bail_out=10000,
-        compute_spotwise_pvals=False
+        compute_spotwise_pvals=False,
+        mc_pvals=True,
+        spot_to_neighbors=None
     ):
     """
     t_nulls, t_obs, p_val, spot_obs_ll_diffs, spot_perm_ll_diffs
@@ -745,32 +787,68 @@ def _within_groups_test(
                 if compute_spotwise_pvals:
                     spotwise_t_nulls.append(perm_spot_lls)
 
-        for t_null in t_nulls:
-            all_t_nulls.append(t_null)
-            if t_null > t_obs:
-                n_nulls_great += 1
-            if n_nulls_great == sequential_n_greater:
-                hit_threshold = True
-                p_val = n_nulls_great / len(all_t_nulls)
-                if verbose > 0:
-                    print(f"Number of nulls > obs has hit threshold of {sequential_n_greater}. Total permutations used: {len(all_t_nulls)}. P-value = {p_val}")
-                stop_monte_carlo = True
-                break
-            if len(all_t_nulls) >= (sequential_bail_out-1):
-                p_val = (n_nulls_great + 1) / sequential_bail_out
-                if verbose > 0:
-                    print(f"Hit maximum permutations threshold of {sequential_n_greater}. P-value = {p_val}")
-                stop_monte_carlo = True
-                break
+        if mc_pvals:
+            for t_null in t_nulls:
+                all_t_nulls.append(t_null)
+                if t_null > t_obs:
+                    n_nulls_great += 1
+                if n_nulls_great == sequential_n_greater:
+                    hit_threshold = True
+                    p_val = n_nulls_great / len(all_t_nulls)
+                    if verbose > 0:
+                        print(f"Number of nulls > obs has hit threshold of {sequential_n_greater}. Total permutations used: {len(all_t_nulls)}. P-value = {p_val}")
+                    stop_monte_carlo = True
+                    break
+                if len(all_t_nulls) >= (sequential_bail_out-1):
+                    p_val = (n_nulls_great + 1) / sequential_bail_out
+                    if verbose > 0:
+                        print(f"Hit maximum permutations threshold of {sequential_n_greater}. P-value = {p_val}")
+                    stop_monte_carlo = True
+                    break
+        else:
+            for t_null in t_nulls:
+                all_t_nulls.append(t_null)
+                if t_null > t_obs:
+                    n_nulls_great += 1
+                if len(all_t_nulls) >= (sequential_bail_out-1):
+                    p_val = (n_nulls_great + 1) / sequential_bail_out
+                    stop_monte_carlo = True
+                    break
 
     # Create an NxP array where N is number of spots
     # P is number of null samples where each row stores
-    # the null spotwise statistics for each spot
-    spotwise_t_nulls = np.array(spotwise_t_nulls).T
-    spot_p_vals = []
-    for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, spotwise_t_nulls):
-        spot_p_val = len([x for x in null_spot_lls if x > obs_spot_ll]) / len(null_spot_lls) 
-        spot_p_vals.append(spot_p_val)
+    # the null spotwise statistics for each spot.
+    # Because we may have more permutations than we used (due
+    # to computation of Monte-Carlo p-values), we restrict to 
+    # only number of permutations used.
+    spotwise_t_nulls = np.array(spotwise_t_nulls)[:len(all_t_nulls),:]
+    spotwise_t_nulls = spotwise_t_nulls.T
+    spot_neigh_t_nulls = []
+    obs_neight_lls = []
+    if spot_to_neighbors:
+        spot_to_index = {
+            spot: s_i
+            for s_i, spot in enumerate(df_filt.index)
+        }
+        for spot in df_filt.index:
+            neighs = set(spot_to_neighbors[spot]) | set([spot])
+            neigh_inds = [spot_to_index[x] for x in neighs if x in spot_to_index]
+            obs_neight_lls.append(np.sum(np.array(obs_spot_lls)[neigh_inds]))
+            spot_neigh_t_nulls.append(np.sum(spotwise_t_nulls[neigh_inds,:], axis=0))
+        spot_neigh_t_nulls = np.array(spot_neigh_t_nulls)
+        print("Shape of neighborhood nulls matrix: ", spot_neigh_t_nulls.shape)
+        assert spot_neigh_t_nulls.shape == spotwise_t_nulls.shape
+
+        # Compute spot-wise p-values using neighborhood-summed log-likelihoods at each spot
+        spot_p_vals = []
+        for obs_spot_ll, null_spot_lls in zip(obs_neight_lls, spot_neigh_t_nulls):
+            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / len(null_spot_lls)
+            spot_p_vals.append(spot_p_val)
+    else:
+        spot_p_vals = []
+        for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, spotwise_t_nulls):
+            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / len(null_spot_lls) 
+            spot_p_vals.append(spot_p_val)
     return p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals
 
 
@@ -787,7 +865,9 @@ def run_test(
         test_between_conds=False,
         compute_spotwise_pvals=False,
         standardize_var=False,
-        max_perms=10000
+        max_perms=10000,
+        mc_pvals=True,
+        spot_to_neighbors=None
     ):
 
     # Extract expression data
@@ -839,7 +919,9 @@ def run_test(
             keep_indices=keep_inds,
             compute_spotwise_pvals=compute_spotwise_pvals,
             sequential_bail_out=max_perms,
-            standardize_var=standardize_var
+            standardize_var=standardize_var,
+            mc_pvals=mc_pvals,
+            spot_to_neighbors=spot_to_neighbors
         )
     else:
         p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals = _within_groups_test(
@@ -852,7 +934,9 @@ def run_test(
             n_procs=n_procs,
             keep_indices=keep_inds,
             compute_spotwise_pvals=compute_spotwise_pvals,
-            sequential_bail_out=max_perms
+            sequential_bail_out=max_perms,
+            mc_pvals=mc_pvals,
+            spot_to_neighbors=spot_to_neighbors
         )
     return p_val, t_obs, t_nulls, keep_inds, obs_spot_lls, spotwise_t_nulls, spot_p_vals
 
