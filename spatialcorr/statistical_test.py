@@ -515,6 +515,7 @@ def _between_groups_test(
     n_nulls_great = 0        # Number of null statistics greater than the observed
     PERM_SIZE = 100           # Every batch, we compute a set number of permutations
     all_t_nulls = []
+    all_spotwise_t_nulls = []
     while not stop_monte_carlo:
         # Compute permutations conditioned on cell type
         perms = _permute_expression_cond_cell_type(
@@ -559,6 +560,8 @@ def _between_groups_test(
                 if verbose > 2:
                     print(f"Worker {p_i} finished.")
                 p.join()
+
+
         else:
             t_nulls = []
             spotwise_t_nulls = []
@@ -581,6 +584,10 @@ def _between_groups_test(
                 t_nulls.append(perm_ll)
                 if compute_spotwise_pvals:
                     spotwise_t_nulls.append(perm_spot_lls)
+
+        # Add all new spotwise statistics for each permutation
+        # to the full collection
+        all_spotwise_t_nulls += spotwise_t_nulls
 
         if mc_pvals:
             for t_null in t_nulls:
@@ -614,8 +621,8 @@ def _between_groups_test(
     # Because we may have more permutations than we used (due
     # to computation of Monte-Carlo p-values), we restrict to 
     # only number of permutations used.
-    spotwise_t_nulls = np.array(spotwise_t_nulls)[:len(all_t_nulls),:]
-    spotwise_t_nulls = spotwise_t_nulls.T
+    all_spotwise_t_nulls = np.array(all_spotwise_t_nulls)[:len(all_t_nulls),:]
+    all_spotwise_t_nulls = all_spotwise_t_nulls.T
     spot_neigh_t_nulls = []
     obs_neight_lls = []
     if spot_to_neighbors:
@@ -627,22 +634,22 @@ def _between_groups_test(
             neighs = set(spot_to_neighbors[spot]) | set([spot])
             neigh_inds = [spot_to_index[x] for x in neighs if x in spot_to_index]
             obs_neight_lls.append(np.sum(np.array(obs_spot_lls)[neigh_inds]))
-            spot_neigh_t_nulls.append(np.sum(spotwise_t_nulls[neigh_inds,:], axis=0))
+            spot_neigh_t_nulls.append(np.sum(all_spotwise_t_nulls[neigh_inds,:], axis=0))
         spot_neigh_t_nulls = np.array(spot_neigh_t_nulls)
-        print("Shape of neighborhood nulls matrix: ", spot_neigh_t_nulls.shape)
-        assert spot_neigh_t_nulls.shape == spotwise_t_nulls.shape
+        assert spot_neigh_t_nulls.shape == all_spotwise_t_nulls.shape
 
         # Compute spot-wise p-values using neighborhood-summed log-likelihoods at each spot
         spot_p_vals = []
         for obs_spot_ll, null_spot_lls in zip(obs_neight_lls, spot_neigh_t_nulls):
-            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / len(null_spot_lls)
+            # The +1 in the numerator and denominator is the observed test statistic
+            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / (len(null_spot_lls)+1)
             spot_p_vals.append(spot_p_val)
     else:
         spot_p_vals = []
-        for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, spotwise_t_nulls):
-            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / len(null_spot_lls)
+        for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, all_spotwise_t_nulls):
+            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / (len(null_spot_lls)+1)
             spot_p_vals.append(spot_p_val)
-    return p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals
+    return p_val, t_obs, t_nulls, obs_spot_lls, all_spotwise_t_nulls, spot_p_vals
 
 
 
@@ -724,6 +731,7 @@ def _within_groups_test(
     n_nulls_great = 0        # Number of null statistics greater than the observed
     PERM_SIZE = 100          # Every batch, we compute a set number of permutations
     all_t_nulls = []
+    all_spotwise_t_nulls = []
     while not stop_monte_carlo:
         # Compute permutations conditioned on cell type
         perms = _permute_expression_cond_cell_type(
@@ -787,6 +795,10 @@ def _within_groups_test(
                 if compute_spotwise_pvals:
                     spotwise_t_nulls.append(perm_spot_lls)
 
+        # Add all new spotwise statistics for each permutation
+        # to the full collection
+        all_spotwise_t_nulls += spotwise_t_nulls
+
         if mc_pvals:
             for t_null in t_nulls:
                 all_t_nulls.append(t_null)
@@ -821,8 +833,8 @@ def _within_groups_test(
     # Because we may have more permutations than we used (due
     # to computation of Monte-Carlo p-values), we restrict to 
     # only number of permutations used.
-    spotwise_t_nulls = np.array(spotwise_t_nulls)[:len(all_t_nulls),:]
-    spotwise_t_nulls = spotwise_t_nulls.T
+    all_spotwise_t_nulls = np.array(all_spotwise_t_nulls)[:len(all_t_nulls),:]
+    all_spotwise_t_nulls = all_spotwise_t_nulls.T
     spot_neigh_t_nulls = []
     obs_neight_lls = []
     if spot_to_neighbors:
@@ -834,22 +846,21 @@ def _within_groups_test(
             neighs = set(spot_to_neighbors[spot]) | set([spot])
             neigh_inds = [spot_to_index[x] for x in neighs if x in spot_to_index]
             obs_neight_lls.append(np.sum(np.array(obs_spot_lls)[neigh_inds]))
-            spot_neigh_t_nulls.append(np.sum(spotwise_t_nulls[neigh_inds,:], axis=0))
+            spot_neigh_t_nulls.append(np.sum(all_spotwise_t_nulls[neigh_inds,:], axis=0))
         spot_neigh_t_nulls = np.array(spot_neigh_t_nulls)
-        print("Shape of neighborhood nulls matrix: ", spot_neigh_t_nulls.shape)
-        assert spot_neigh_t_nulls.shape == spotwise_t_nulls.shape
+        assert spot_neigh_t_nulls.shape == all_spotwise_t_nulls.shape
 
         # Compute spot-wise p-values using neighborhood-summed log-likelihoods at each spot
         spot_p_vals = []
         for obs_spot_ll, null_spot_lls in zip(obs_neight_lls, spot_neigh_t_nulls):
-            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / len(null_spot_lls)
+            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / (len(null_spot_lls)+1)
             spot_p_vals.append(spot_p_val)
     else:
         spot_p_vals = []
-        for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, spotwise_t_nulls):
-            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / len(null_spot_lls) 
+        for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, all_spotwise_t_nulls):
+            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / (len(null_spot_lls)+1) 
             spot_p_vals.append(spot_p_val)
-    return p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals
+    return p_val, t_obs, t_nulls, obs_spot_lls, all_spotwise_t_nulls, spot_p_vals
 
 
 def run_test(
