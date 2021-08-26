@@ -7,8 +7,8 @@ import math
 import importlib
 import seaborn as sns
 from collections import defaultdict
-from sklearn.metrics.pairwise import euclidean_distances
 from multiprocessing import Process, Queue, Manager
+from sklearn.metrics.pairwise import euclidean_distances
 
 import matplotlib.cm
 from matplotlib.colors import ListedColormap
@@ -615,40 +615,42 @@ def _between_groups_test(
                     stop_monte_carlo = True
                     break
 
-    # Create an NxP array where N is number of spots
-    # P is number of null samples where each row stores
-    # the null spotwise statistics for each spot.
-    # Because we may have more permutations than we used (due
-    # to computation of Monte-Carlo p-values), we restrict to 
-    # only number of permutations used.
-    all_spotwise_t_nulls = np.array(all_spotwise_t_nulls)[:len(all_t_nulls),:]
-    all_spotwise_t_nulls = all_spotwise_t_nulls.T
-    spot_neigh_t_nulls = []
-    obs_neight_lls = []
-    if spot_to_neighbors:
-        spot_to_index = {
-            spot: s_i
-            for s_i, spot in enumerate(df_filt.index)
-        }
-        for spot in df_filt.index:
-            neighs = set(spot_to_neighbors[spot]) | set([spot])
-            neigh_inds = [spot_to_index[x] for x in neighs if x in spot_to_index]
-            obs_neight_lls.append(np.sum(np.array(obs_spot_lls)[neigh_inds]))
-            spot_neigh_t_nulls.append(np.sum(all_spotwise_t_nulls[neigh_inds,:], axis=0))
-        spot_neigh_t_nulls = np.array(spot_neigh_t_nulls)
-        assert spot_neigh_t_nulls.shape == all_spotwise_t_nulls.shape
+    spot_p_vals = None
+    if compute_spotwise_pvals:
+        # Create an NxP array where N is number of spots
+        # P is number of null samples where each row stores
+        # the null spotwise statistics for each spot.
+        # Because we may have more permutations than we used (due
+        # to computation of Monte-Carlo p-values), we restrict to 
+        # only number of permutations used.
+        all_spotwise_t_nulls = np.array(all_spotwise_t_nulls)[:len(all_t_nulls),:]
+        all_spotwise_t_nulls = all_spotwise_t_nulls.T
+        spot_neigh_t_nulls = []
+        obs_neight_lls = []
+        if spot_to_neighbors:
+            spot_to_index = {
+                spot: s_i
+                for s_i, spot in enumerate(df_filt.index)
+            }
+            for spot in df_filt.index:
+                neighs = set(spot_to_neighbors[spot]) | set([spot])
+                neigh_inds = [spot_to_index[x] for x in neighs if x in spot_to_index]
+                obs_neight_lls.append(np.sum(np.array(obs_spot_lls)[neigh_inds]))
+                spot_neigh_t_nulls.append(np.sum(all_spotwise_t_nulls[neigh_inds,:], axis=0))
+            spot_neigh_t_nulls = np.array(spot_neigh_t_nulls)
+            assert spot_neigh_t_nulls.shape == all_spotwise_t_nulls.shape
 
-        # Compute spot-wise p-values using neighborhood-summed log-likelihoods at each spot
-        spot_p_vals = []
-        for obs_spot_ll, null_spot_lls in zip(obs_neight_lls, spot_neigh_t_nulls):
-            # The +1 in the numerator and denominator is the observed test statistic
-            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / (len(null_spot_lls)+1)
-            spot_p_vals.append(spot_p_val)
-    else:
-        spot_p_vals = []
-        for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, all_spotwise_t_nulls):
-            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / (len(null_spot_lls)+1)
-            spot_p_vals.append(spot_p_val)
+            # Compute spot-wise p-values using neighborhood-summed log-likelihoods at each spot
+            spot_p_vals = []
+            for obs_spot_ll, null_spot_lls in zip(obs_neight_lls, spot_neigh_t_nulls):
+                # The +1 in the numerator and denominator is the observed test statistic
+                spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / (len(null_spot_lls)+1)
+                spot_p_vals.append(spot_p_val)
+        else:
+            spot_p_vals = []
+            for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, all_spotwise_t_nulls):
+                spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / (len(null_spot_lls)+1)
+                spot_p_vals.append(spot_p_val)
     return p_val, t_obs, t_nulls, obs_spot_lls, all_spotwise_t_nulls, spot_p_vals
 
 
@@ -952,80 +954,114 @@ def run_test(
     return p_val, t_obs, t_nulls, keep_inds, obs_spot_lls, spotwise_t_nulls, spot_p_vals
 
 
+def run_test_between_region_pairs(
+        adata,
+        test_genes,
+        sigma,
+        cond_key,
+        contrib_thresh=10,
+        row_key='row',
+        col_key='col',
+        verbose=1,
+        n_procs=1,
+        standardize_var=False,
+        max_perms=10000,
+        mc_pvals=True,
+        spot_to_neighbors=None
+    ):
 
-#def log_likelihood_ratio_test(
-#        expr,
-#        df,
-#        sigma,
-#        cell_type_key='cluster',
-#        cond_cell_type=False,
-#        contrib_thresh=5,
-#        x_col='col',
-#        y_col='row',
-#        verbose=10,
-#        n_procs=1,
-#        between_cell_types=False,
-#        max_perms=10000
-#    ):
-#    # Compute kernel matrix
-#    kernel_matrix = _compute_kernel_matrix(
-#        df, 
-#        sigma=sigma, 
-#        cell_type_key=cell_type_key,
-#        condition_on_cell_type=cond_cell_type,
-#        y_col=y_col,
-#        x_col=x_col
-#    )
-#
-#    # Filter spots with too little contribution 
-#    # from neighbors
-#    contrib = np.sum(kernel_matrix, axis=1)
-#    keep_inds = [
-#        i
-#        for i, c in enumerate(contrib)
-#        if c >= contrib_thresh
-#    ]
-#    if verbose >= 1:
-#        print('Kept {}/{} spots.'.format(len(keep_inds), len(df)))
-#
-#    # Map each cell type to its indices
-#    if cond_cell_type:
-#        ct_to_indices = defaultdict(lambda: [])
-#        for i, ct in enumerate(df[cell_type_key]):
-#            ct_to_indices[ct].append(i)
-#    else:
-#        ct_to_indices = {'all': np.arange(len(df))}
-#
-#    if between_cell_types:
-#        assert cond_cell_type
-#        p_val, t_obs, t_nulls, obs_spot_lls = _between_groups_test(
-#            expr,
-#            df,
-#            kernel_matrix,
-#            ct_to_indices,
-#            verbose=verbose,
-#            n_procs=n_procs,
-#            keep_indices=keep_inds,
-#            compute_spotwise_pvals=compute_spotwise_pvals,
-#            sequential_bail_out=max_perms
-#        )
-#    else:
-#        p_val, t_obs, t_nulls, obs_spot_lls = _within_groups_test(
-#            expr,
-#            df,
-#            kernel_matrix,
-#            plot_lls=False,
-#            ct_to_indices=ct_to_indices,
-#            verbose=verbose,
-#            n_procs=n_procs,
-#            keep_indices=keep_inds,
-#            compute_spotwise_pvals=compute_spotwise_pvals,
-#            sequential_bail_out=max_perms
-#        )
-#
-#    return p_val, spot_p_vals, t_obs, t_nulls
+    # Filter spots with too little contribution 
+    # from neighbors
+    # Compute kernel matrix
+    kernel_matrix = _compute_kernel_matrix(
+        adata.obs,
+        sigma=sigma,
+        cell_type_key=cond_key,
+        condition_on_cell_type=True,
+        y_col=row_key,
+        x_col=col_key
+    )
+    contrib = np.sum(kernel_matrix, axis=1)
+    keep_inds = [
+        i
+        for i, c in enumerate(contrib)
+        if c >= contrib_thresh
+    ]
+    if verbose >= 1:
+        print('Kept {}/{} spots.'.format(len(keep_inds), len(adata.obs)))
+    adata = adata[keep_inds,:]
 
+    # Map each cell type to its indices
+    ct_to_indices = defaultdict(lambda: [])
+    for i, ct in enumerate(adata.obs[cond_key]):
+        ct_to_indices[ct].append(i)
 
+    ct_to_ct_to_pval = defaultdict(lambda: {})
+    for ct_1_i, ct_1 in enumerate(sorted(set(adata.obs[cond_key]))):
+        for ct_2_i, ct_2 in enumerate(sorted(set(adata.obs[cond_key]))):
+            if ct_2 >= ct_1:
+                continue
+
+            clust_inds = list(ct_to_indices[ct_1]) + list(ct_to_indices[ct_2])
+            adata_clust = adata[clust_inds,:]
+
+            # Extract expression data
+            expr = np.array([
+                adata_clust.obs_vector(gene)
+                for gene in test_genes
+            ]) 
+
+            # Compute kernel matrix
+            kernel_matrix_clust = _compute_kernel_matrix(
+                adata_clust.obs,
+                sigma=sigma,
+                cell_type_key=cond_key,
+                condition_on_cell_type=True,
+                y_col=row_key,
+                x_col=col_key
+            )
+
+            # Filter spots with too little contribution 
+            # from neighbors
+            contrib = np.sum(kernel_matrix_clust, axis=1)
+            keep_inds = [
+                i
+                for i, c in enumerate(contrib)
+                if c >= contrib_thresh
+            ]
+            if verbose >= 1:
+                print('For cluster pair ({}, {}), kept {}/{} spots.'.format(
+                    ct_1,
+                    ct_2,
+                    len(keep_inds), 
+                    len(adata_clust.obs)
+                ))    
+
+            # Re-map each cluster to its indices now that we have restricted
+            # the dataset to only two clusters
+            ct_to_indices_clust = defaultdict(lambda: [])
+            for i, ct in enumerate(adata_clust.obs[cond_key]):
+                ct_to_indices_clust[ct].append(i)
+
+            p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals = _between_groups_test(
+                expr,
+                adata_clust.obs,
+                kernel_matrix_clust,
+                ct_to_indices_clust, 
+                verbose=verbose,
+                n_procs=n_procs,
+                keep_indices=keep_inds,
+                compute_spotwise_pvals=False,
+                sequential_bail_out=max_perms,
+                standardize_var=standardize_var,
+                mc_pvals=mc_pvals,
+                spot_to_neighbors=None
+            )
+
+            ct_to_ct_to_pval[ct_1][ct_2] = p_val
+            ct_to_ct_to_pval[ct_2][ct_1] = p_val
+    return ct_to_ct_to_pval
+    
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
