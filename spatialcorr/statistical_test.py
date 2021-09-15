@@ -134,6 +134,10 @@ def _permute_expression_cond_cell_type(X, ct_to_indices, n_perms):
         perms[:,indices,:] = ct_perms
     return perms
 
+def _chunks(lst, n):
+    """Yield successive n-sized chunks from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
@@ -534,7 +538,7 @@ def _between_groups_test(
             chunk_size = math.ceil(len(perms) / n_procs)
             if verbose > 1:
                 print(f"Chunk size is {chunk_size}")
-            perm_chunks = chunks(perms, chunk_size)
+            perm_chunks = _chunks(perms, chunk_size)
             jobs = []
             for worker_id, chunk in enumerate(perm_chunks):
                 p = Process(
@@ -566,8 +570,8 @@ def _between_groups_test(
             t_nulls = []
             spotwise_t_nulls = []
             for perm_i, perm in enumerate(perms):
-                if verbose and perm_i % 10 == 0:
-                    print('Computing ratio statistic for permutation {}/{}'.format(perm_i+1, len(perms)))
+                if verbose > 1 and perm_i % 10 == 0:
+                    print('Computing statistic for permutation {}/{}'.format(perm_i+1, len(perms)))
 
                 # Compute alternative likelihoods
                 perm_ll, perm_spot_lls  = compute_llrts_between(
@@ -664,11 +668,12 @@ def _within_groups_test(
         verbose=False,
         n_procs=1,
         ct_to_indices=None,
+        ct_to_indices_filt=None,
         keep_indices=None,
         use_sequential=True, 
         sequential_n_greater=20, 
         sequential_bail_out=10000,
-        compute_spotwise_pvals=False,
+        compute_clust_pvals=False,
         mc_pvals=True,
         spot_to_neighbors=None
     ):
@@ -685,7 +690,7 @@ def _within_groups_test(
     # Create a "cell type" consisting of all spots
     if ct_to_indices is None:
         ct_to_indices = {'all': list(np.arange(len(expr.T)))}    
-    
+
     # Map index to cell type
     index_to_ct = {}
     for ct, indices in ct_to_indices.items():
@@ -752,7 +757,7 @@ def _within_groups_test(
             chunk_size = math.ceil(len(perms) / n_procs)
             if verbose > 1:
                 print(f"Chunk size is {chunk_size}")
-            perm_chunks = chunks(perms, chunk_size)
+            perm_chunks = _chunks(perms, chunk_size)
             jobs = []
             for worker_id, chunk in enumerate(perm_chunks):
                 p = Process(
@@ -767,7 +772,7 @@ def _within_groups_test(
                         null_corrs_filt,
                         keep_indices,
                         verbose,
-                        compute_spotwise_pvals
+                        compute_clust_pvals
                     )
                 )
                 jobs.append(p)
@@ -794,7 +799,7 @@ def _within_groups_test(
 
                 # Record the test statistic for this null sample
                 t_nulls.append(perm_ll)
-                if compute_spotwise_pvals:
+                if compute_clust_pvals:
                     spotwise_t_nulls.append(perm_spot_lls)
 
         # Add all new spotwise statistics for each permutation
@@ -829,40 +834,67 @@ def _within_groups_test(
                     stop_monte_carlo = True
                     break
 
-    # Create an NxP array where N is number of spots
-    # P is number of null samples where each row stores
-    # the null spotwise statistics for each spot.
-    # Because we may have more permutations than we used (due
-    # to computation of Monte-Carlo p-values), we restrict to 
-    # only number of permutations used.
-    all_spotwise_t_nulls = np.array(all_spotwise_t_nulls)[:len(all_t_nulls),:]
-    all_spotwise_t_nulls = all_spotwise_t_nulls.T
-    spot_neigh_t_nulls = []
-    obs_neight_lls = []
-    if spot_to_neighbors:
-        spot_to_index = {
-            spot: s_i
-            for s_i, spot in enumerate(df_filt.index)
-        }
-        for spot in df_filt.index:
-            neighs = set(spot_to_neighbors[spot]) | set([spot])
-            neigh_inds = [spot_to_index[x] for x in neighs if x in spot_to_index]
-            obs_neight_lls.append(np.sum(np.array(obs_spot_lls)[neigh_inds]))
-            spot_neigh_t_nulls.append(np.sum(all_spotwise_t_nulls[neigh_inds,:], axis=0))
-        spot_neigh_t_nulls = np.array(spot_neigh_t_nulls)
-        assert spot_neigh_t_nulls.shape == all_spotwise_t_nulls.shape
+    ct_to_p_val = None
+    if compute_clust_pvals:
+        # Create an NxP array where N is number of spots
+        # P is number of null samples where each row stores
+        # the null spotwise statistics for each spot.
+        # Because we may have more permutations than we used (due
+        # to computation of Monte-Carlo p-values), we restrict to
+        # only number of permutations used.
+        all_spotwise_t_nulls = np.array(all_spotwise_t_nulls)[:len(all_t_nulls),:]
+        all_spotwise_t_nulls = all_spotwise_t_nulls.T
 
-        # Compute spot-wise p-values using neighborhood-summed log-likelihoods at each spot
-        spot_p_vals = []
-        for obs_spot_ll, null_spot_lls in zip(obs_neight_lls, spot_neigh_t_nulls):
-            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / (len(null_spot_lls)+1)
-            spot_p_vals.append(spot_p_val)
-    else:
-        spot_p_vals = []
-        for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, all_spotwise_t_nulls):
-            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / (len(null_spot_lls)+1) 
-            spot_p_vals.append(spot_p_val)
-    return p_val, t_obs, t_nulls, obs_spot_lls, all_spotwise_t_nulls, spot_p_vals
+        ct_to_obs = {
+            ct: np.sum(np.array(obs_spot_lls)[inds])
+            for ct, inds in ct_to_indices_filt.items()
+        }
+        ct_to_nulls = {
+            ct: np.sum(all_spotwise_t_nulls[inds,:], axis=0)
+            for ct, inds in ct_to_indices_filt.items()
+        }
+        ct_to_p_val = {
+            ct: (len([x for x in ct_to_nulls[ct] if x > ct_to_obs[ct]])+1) / (len(ct_to_nulls[ct])+1)
+            for ct in ct_to_nulls
+        }
+    
+
+    #spot_p_vals = None
+    #if compute_spotwise_pvals:
+    #    # Create an NxP array where N is number of spots
+    #    # P is number of null samples where each row stores
+    #    # the null spotwise statistics for each spot.
+    #    # Because we may have more permutations than we used (due
+    #    # to computation of Monte-Carlo p-values), we restrict to 
+    #    # only number of permutations used.
+    #    all_spotwise_t_nulls = np.array(all_spotwise_t_nulls)[:len(all_t_nulls),:]
+    #    all_spotwise_t_nulls = all_spotwise_t_nulls.T
+    #    spot_neigh_t_nulls = []
+    #    obs_neight_lls = []
+    #    if spot_to_neighbors:
+    #        spot_to_index = {
+    #            spot: s_i
+    #            for s_i, spot in enumerate(df_filt.index)
+    #        }
+    #        for spot in df_filt.index:
+    #            neighs = set(spot_to_neighbors[spot]) | set([spot])
+    #            neigh_inds = [spot_to_index[x] for x in neighs if x in spot_to_index]
+    #            obs_neight_lls.append(np.sum(np.array(obs_spot_lls)[neigh_inds]))
+    #            spot_neigh_t_nulls.append(np.sum(all_spotwise_t_nulls[neigh_inds,:], axis=0))
+    #        spot_neigh_t_nulls = np.array(spot_neigh_t_nulls)
+    #        assert spot_neigh_t_nulls.shape == all_spotwise_t_nulls.shape
+    #
+    #        # Compute spot-wise p-values using neighborhood-summed log-likelihoods at each spot
+    #        spot_p_vals = []
+    #        for obs_spot_ll, null_spot_lls in zip(obs_neight_lls, spot_neigh_t_nulls):
+    #            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / (len(null_spot_lls)+1)
+    #            spot_p_vals.append(spot_p_val)
+    #    else:
+    #        spot_p_vals = []
+    #        for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, all_spotwise_t_nulls):
+    #            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / (len(null_spot_lls)+1) 
+    #            spot_p_vals.append(spot_p_val)
+    return p_val, t_obs, t_nulls, obs_spot_lls, all_spotwise_t_nulls, ct_to_p_val
 
 
 def run_test(
@@ -912,13 +944,19 @@ def run_test(
     if verbose >= 1:
         print('Kept {}/{} spots.'.format(len(keep_inds), len(adata.obs)))
 
-    # Map each cell type to its indices
+    # Map each cell type to its indices in the full dataset
     if condition:
         ct_to_indices = defaultdict(lambda: [])
         for i, ct in enumerate(adata.obs[cond_key]):
             ct_to_indices[ct].append(i)
     else:
         ct_to_indices = {'all': np.arange(len(adata.obs))}
+
+    # Mape each cell type to the its indices in the filtered
+    # dataset
+    ct_to_indices_filt = defaultdict(lambda: [])
+    for filt_ind, ct in enumerate(adata.obs.iloc[keep_inds][cond_key]):
+        ct_to_indices_filt[ct].append(filt_ind)
 
     if test_between_conds:
         assert condition
@@ -943,10 +981,11 @@ def run_test(
             kernel_matrix,
             plot_lls=False,
             ct_to_indices=ct_to_indices,
+            ct_to_indices_filt=ct_to_indices_filt,
             verbose=verbose,
             n_procs=n_procs,
             keep_indices=keep_inds,
-            compute_spotwise_pvals=compute_spotwise_pvals,
+            compute_clust_pvals=compute_spotwise_pvals, # TODO change variable name
             sequential_bail_out=max_perms,
             mc_pvals=mc_pvals,
             spot_to_neighbors=spot_to_neighbors
@@ -967,7 +1006,8 @@ def run_test_between_region_pairs(
         standardize_var=False,
         max_perms=10000,
         mc_pvals=True,
-        spot_to_neighbors=None
+        spot_to_neighbors=None,
+        run_regions=None
     ):
 
     # Filter spots with too little contribution 
@@ -996,9 +1036,13 @@ def run_test_between_region_pairs(
     for i, ct in enumerate(adata.obs[cond_key]):
         ct_to_indices[ct].append(i)
 
+    # If the regionst to run aren't specified, run on all pairs
+    if run_regions is None:
+        run_regions = sorted(set(adata.obs[cond_key]))
+
     ct_to_ct_to_pval = defaultdict(lambda: {})
-    for ct_1_i, ct_1 in enumerate(sorted(set(adata.obs[cond_key]))):
-        for ct_2_i, ct_2 in enumerate(sorted(set(adata.obs[cond_key]))):
+    for ct_1_i, ct_1 in enumerate(sorted(run_regions)):
+        for ct_2_i, ct_2 in enumerate(sorted(run_regions)):
             if ct_2 >= ct_1:
                 continue
 
@@ -1061,8 +1105,74 @@ def run_test_between_region_pairs(
             ct_to_ct_to_pval[ct_1][ct_2] = p_val
             ct_to_ct_to_pval[ct_2][ct_1] = p_val
     return ct_to_ct_to_pval
+   
+
+def est_corr_cis(g1, g2, ad, kernel_matrix, cond_key, neigh_thresh=10, bc_to_neighs=None, n_boots=100, mag=0):
+    expr_1 = ad.obs_vector(g1)
+    expr_2 = ad.obs_vector(g2)
+    if bc_to_neighs is None:
+        row_col_to_barcode = spatialcorr.utils.map_row_col_to_barcode(
+            ad.obs,
+            row_key='row',
+            col_key='col'
+        )
+        bc_to_neighs = spatialcorr.utils.compute_neighbors(
+            ad.obs,
+            row_col_to_barcode,
+            row_key='row',
+            col_key='col',
+            rad=3
+        )
     
-def chunks(lst, n):
-    """Yield successive n-sized chunks from lst."""
-    for i in range(0, len(lst), n):
-        yield lst[i:i + n]
+    clust_to_bcs = defaultdict(lambda: set())
+    for bc, clust in zip(ad.obs.index, ad.obs[cond_key]):
+        clust_to_bcs[clust].add(bc)
+                             
+    bc_to_clust = {
+        bc: clust
+        for bc, clust in zip(ad.obs.index, ad.obs[cond_key])
+    }
+    keep_inds = []
+    bin_corrs = []
+    bc_to_ind = {
+        bc: bc_i
+        for bc_i, bc in enumerate(ad.obs.index)
+    }
+    cis = []
+    for bc_i, bc in enumerate(ad.obs.index):
+        neighs = bc_to_neighs[bc]
+        neighs = set(neighs) | set([bc]) # Add current spot
+        curr_clust = bc_to_clust[bc]
+        neighs = sorted(set(neighs) & clust_to_bcs[curr_clust])
+        if len(neighs) < neigh_thresh:
+            continue
+        keep_inds.append(bc_i)
+        neigh_inds = [bc_to_ind[x] for x in neighs]
+        
+        weights_neigh = kernel_matrix[bc_i][neigh_inds]
+        expr_1_neigh = expr_1[neigh_inds]
+        expr_2_neigh = expr_2[neigh_inds]
+        
+        boot_corrs = []
+        for i in range(n_boots): 
+            boot_inds = np.random.choice(
+                np.arange(len(expr_1_neigh)), 
+                size=len(expr_1_neigh), 
+                replace=True
+            )
+            e_1_boot = expr_1_neigh[boot_inds]
+            e_2_boot = expr_2_neigh[boot_inds]
+            weights_boot = weights_neigh[boot_inds]
+            
+            mean_1_boot = sum(e_1_boot * weights_boot) / sum(weights_boot)
+            mean_2_boot = sum(e_2_boot * weights_boot) / sum(weights_boot)
+            var_1_boot = sum( np.power((e_1_boot - mean_1_boot), 2) * weights_boot) / sum(weights_boot)
+            var_2_boot = sum( np.power((e_1_boot - mean_2_boot), 2) * weights_boot) / sum(weights_boot)
+            cov_boot = sum( (e_1_boot - mean_1_boot) * (e_2_boot - mean_2_boot) * weights_boot) / sum(weights_boot)
+            corr_boot = cov_boot / np.sqrt(var_1_boot * var_2_boot)
+            
+            boot_corrs.append(corr_boot)
+        boot_corrs = sorted(boot_corrs)
+        cis.append((boot_corrs[5], boot_corrs[95]))
+        
+    return cis, keep_inds
