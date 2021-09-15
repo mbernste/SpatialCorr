@@ -86,22 +86,6 @@ def plot_filtered_spots(
     )
 
 
-def _estimate_correlations(kernel_matrix, expr_1, expr_2):
-    cov_mats = st.kernel_estimation(
-        kernel_matrix,
-        np.array([expr_1, expr_2])
-    )
-    covs = [
-        c[0][1]
-        for c in cov_mats
-    ]
-    corrs = [
-        c[0][1] / np.sqrt(c[0][0] * c[1][1])
-        for c in cov_mats
-    ]
-    return corrs 
-
-
 def plot_correlation(
         adata, 
         gene_1, 
@@ -164,6 +148,71 @@ def plot_correlation(
         extra_data={'region_to_corr': ct_to_corr}
     return corrs, keep_inds, extra_data
 
+
+def plot_ci_overlap(
+        gene_1,
+        gene_2, 
+        adata,
+        condition,
+        kernel_matrix=None,
+        sigma=5,
+        row_key='row',
+        col_key='col',
+        title=None,
+        ax=None,
+        figure=None,
+        ticks=False,
+        dsize=12,
+        colorticks=None,
+        neigh_thresh=10
+    ):
+    if kernel_matrix is None:
+        kernel_matrix = st._compute_kernel_matrix(
+            adata.obs,
+            sigma=sigma,
+            y_col=row_key,
+            x_col=col_key,
+            condition_on_cell_type=(not condition is None),
+            cell_type_key=condition
+        )
+    
+    # Compute confidence intervals
+    cis, keep_inds = est_corr_cis(
+        gene_1, gene_2,
+        adata,
+        neigh_thresh=neigh_thresh,
+        bc_to_neighs=bc_to_neighs,
+        kernel_matrix=kernel_matrix,
+        n_boots=100
+    )
+
+    # Compute spotwise labels
+    bin_corrs = []
+    for ci in cis:
+        if -1 * 0 > ci[1]:
+            bin_corrs.append(-1)
+        elif 0 < ci[0]:
+            bin_corrs.append(1)
+        else:
+            bin_corrs.append(0)
+
+    # Plot slide
+    plot_slide(
+        adata.obs.iloc[keep_inds],
+        bin_corrs,
+        cmap='RdBu_r',
+        colorbar=False,
+        vmin=-1.8,
+        vmax=1.8,
+        title=None,
+        ax=None,
+        figure=None,
+        ticks=False,
+        dsize=dsize,
+        colorticks=None,
+        row_key=row_key,
+        col_key=row_key
+    )
 
 def plot_gradients(
         meta_df,
@@ -295,6 +344,8 @@ def plot_local_scatter(
         plot_vals, 
         color_spots=None, 
         condition=None,
+        vmin=None,
+        vmax=None,
         row_key='row', 
         col_key='col',
         cmap='RdBu_r',
@@ -370,8 +421,8 @@ def plot_local_scatter(
         plot_vals,
         ax=axarr[0],
         dot_size=10,
-        vmin=-1,
-        vmax=1,
+        vmin=vmin,
+        vmax=vmax,
         cmap=cmap,
         neighb_color=neighb_color,
         row_key='row',
@@ -419,31 +470,18 @@ def _plot_correlation_local(
         estimate='local',
         title=None
     ):
-    if kernel_matrix is None:
-        kernel_matrix = st._compute_kernel_matrix(
-            adata.obs,
-            sigma=sigma,
-            y_col=row_key,
-            x_col=col_key,
-            condition_on_cell_type=(not condition is None),
-            cell_type_key=condition
-        )
-        keep_inds = [
-            ind
-            for ind, contrib in enumerate(np.sum(kernel_matrix, axis=1))
-            if contrib >= contrib_thresh
-        ]
-        kernel_matrix = kernel_matrix[:,keep_inds]
-        kernel_matrix = kernel_matrix[keep_inds,:]
+    corrs, keep_inds = utils.compute_local_correlation(
+        adata, 
+        gene_1,
+        gene_2,
+        row_key=row_key, 
+        col_key=col_key, 
+        kernel_matrix=kernel_matrix, 
+        condition=condition, 
+        sigma=sigma,
+        contrib_thresh=contrib_thresh
+    )
 
-    # Filter the spots
-    adata = adata[keep_inds,:]
-
-    corrs = np.array(_estimate_correlations(
-        kernel_matrix, 
-        adata.obs_vector(gene_1), 
-        adata.obs_vector(gene_2)
-    ))
     if corr_magnitude:
         corrs = np.absolute(corrs)
         vmin = 0
@@ -452,7 +490,7 @@ def _plot_correlation_local(
         vmin = -1
         vmax = 1
     plot_slide(
-        adata.obs,
+        adata.obs.iloc[keep_inds],
         corrs,
         cmap=cmap,
         colorbar=colorbar,
