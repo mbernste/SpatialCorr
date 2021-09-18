@@ -218,7 +218,7 @@ def plot_ci_overlap(
         colorbar=False,
         vmin=-1.8,
         vmax=1.8,
-        title=None,
+        title=title,
         ax=ax,
         figure=figure,
         ticks=False,
