@@ -153,7 +153,7 @@ def plot_ci_overlap(
         gene_1,
         gene_2, 
         adata,
-        condition,
+        cond_key,
         kernel_matrix=None,
         sigma=5,
         row_key='row',
@@ -172,17 +172,29 @@ def plot_ci_overlap(
             sigma=sigma,
             y_col=row_key,
             x_col=col_key,
-            condition_on_cell_type=(not condition is None),
-            cell_type_key=condition
+            condition_on_cell_type=(not cond_key is None),
+            cell_type_key=cond_key
         )
-    
+
     # Compute confidence intervals
-    cis, keep_inds = est_corr_cis(
+    row_col_to_barcode = utils.map_row_col_to_barcode(
+        adata.obs,
+        row_key=row_key,
+        col_key=col_key
+    )
+    bc_to_neighs = bc_to_neighs = utils.compute_neighbors(
+        adata.obs,
+        row_col_to_barcode,
+        row_key=row_key,
+        col_key=col_key
+    )
+    cis, keep_inds = st.est_corr_cis(
         gene_1, gene_2,
         adata,
+        kernel_matrix,
+        cond_key=cond_key,
         neigh_thresh=neigh_thresh,
         bc_to_neighs=bc_to_neighs,
-        kernel_matrix=kernel_matrix,
         n_boots=100
     )
 
@@ -205,134 +217,14 @@ def plot_ci_overlap(
         vmin=-1.8,
         vmax=1.8,
         title=None,
-        ax=None,
-        figure=None,
+        ax=ax,
+        figure=figure,
         ticks=False,
         dsize=dsize,
         colorticks=None,
         row_key=row_key,
-        col_key=row_key
-    )
-
-def plot_gradients(
-        meta_df,
-        vals,
-        plot_abs=False,
-        cmap='viridis',
-        colorbar=True,
-        dsize=10,
-        row_key='row',
-        col_key='col',
-        ticks=True,
-        condition=None,
-        vmin=None,
-        vmax=None,
-        ax=None,
-        figure=None,
-        title='Magnitude of gradient'
-    ):
-    abs_diffs = _compute_gradient_magnitudes(
-        meta_df, 
-        vals, 
-        row_key=row_key, 
-        col_key=col_key,
-        condition=condition
-    )
-    #if plot_abs:
-    plot_slide(
-        meta_df,
-        abs_diffs,
-        cmap=cmap,
-        colorbar=colorbar,
-        dsize=dsize,
-        vmin=vmin,
-        vmax=vmax,
-        row_key=row_key,
-        col_key=col_key,
-        ticks=ticks,
-        ax=ax,
-        figure=figure,
-        title=title
-    )
-    #else:
-    #    plot_slide(
-    #        meta_df,
-    #        diffs,
-    #        cmap=cmap,
-    #        colorbar=colorbar,
-    #        dsize=dsize,
-    #        vmin=vmin,
-    #        vmax=vmax,
-    #        row_key=row_key,
-    #        col_key=col_key,
-    #        ticks=ticks,
-    #        ax=ax,
-    #        figure=figure,
-    #        title=title
-    #    )
-    return abs_diffs
-
-def _compute_gradient_magnitudes(
-        meta_df,
-        vals,
-        row_key='row',
-        col_key='col',
-        condition=None
-    ):
-    bc_to_val = {
-        bc: val
-        for bc, val in zip(meta_df.index, vals)
-    }
-
-    row_col_to_barcode = utils.map_row_col_to_barcode(
-        meta_df,
-        row_key=row_key,
         col_key=col_key
     )
-    bc_to_neighs = utils.compute_neighbors(
-        meta_df,
-        row_col_to_barcode,
-        row_key=row_key,
-        col_key=col_key,
-        rad=2
-    )
-
-    if condition is not None:
-        bc_to_ct = {
-            bc: ro[condition]
-            for bc, ro in meta_df.iterrows()
-        }
-
-        ct_to_bcs = defaultdict(lambda: [])
-        for bc, ro in meta_df.iterrows():
-            ct = ro[condition]
-            ct_to_bcs[ct].append(bc)
-
-        bc_to_neighs_new = {}
-        for bc, neighs in bc_to_neighs.items():
-            new_neighs = set(neighs) & set(ct_to_bcs[bc_to_ct[bc]])
-            bc_to_neighs_new[bc] = new_neighs
-        bc_to_neighs = bc_to_neighs_new
-
-    diffs = []
-    abs_diffs = []
-    for bc in meta_df.index:
-        neighs = bc_to_neighs[bc]
-        curr_val = bc_to_val[bc]
-        max_abs_diff = 0
-        max_diff = 0
-        for neigh in neighs:
-            neigh_val = bc_to_val[neigh]
-            diff = curr_val - neigh_val
-            if diff > 0:
-                continue
-            abs_diff = abs(diff)
-            if abs_diff > max_abs_diff:
-                max_abs_diff = abs_diff
-                max_diff = diff
-        #diffs.append(max_abs_diff)
-        abs_diffs.append(max_abs_diff)
-    return abs_diffs
 
 
 def plot_local_scatter(
