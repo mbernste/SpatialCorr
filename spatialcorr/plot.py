@@ -4,6 +4,8 @@ import matplotlib.patches as mpatches
 import numpy as np
 from collections import defaultdict
 import seaborn as sns
+from scipy.cluster.hierarchy import dendrogram, set_link_color_palette
+from sklearn.cluster import AgglomerativeClustering
 
 from . import statistical_test as st
 from . import utils
@@ -525,6 +527,7 @@ def plot_slide(
         ax.set_xticks([])
         ax.set_yticks([])
 
+
 def plot_neighborhood(
         df,
         sources,
@@ -604,4 +607,217 @@ def plot_neighborhood(
     if plot:
         plt.show()
     return ax
+
+
+
+
+def mult_genes_plot_correlation(
+        plot_genes,
+        adata,
+        cond_key,
+        sigma=5,
+        contrib_thresh=10,
+        estimate_type='local',
+        dsize=7,
+        fig_path=None,
+        row_key='row',
+        col_key='col'
+    ):
+    # Select all genes that are in the data
+    plot_genes = [
+        gene for gene in plot_genes
+        if gene in adata.var.index
+    ]
+
+    fig, axarr = plt.subplots(
+        len(plot_genes),
+        len(plot_genes),
+        figsize=(2*len(plot_genes),2*len(plot_genes))
+    )
+
+    # Compute kept indices
+    corrs, keep_inds = utils.compute_local_correlation(
+        adata,
+        plot_genes[0], plot_genes[1],
+        kernel_matrix=None,
+        row_key=row_key,
+        col_key=col_key,
+        condition=cond_key,
+        sigma=sigma,
+        contrib_thresh=contrib_thresh
+    )
+
+    # Get range of expression values for colormap
+    # of expression
+    all_expr = []
+    for gene in plot_genes:
+        expr = adata[keep_inds,:].obs_vector(gene)
+        all_expr += list(expr)
+    min_expr = min(all_expr)
+    max_expr = max(all_expr)
+
+    for row, ax_row in enumerate(axarr):
+        for col, ax in enumerate(ax_row):
+            gene_1 = plot_genes[row]
+            gene_2 = plot_genes[col]
+
+            if row == 0:
+                title = gene_2
+            else:
+                title = None
+
+            if col == row:
+                plot_slide(
+                    adata[keep_inds,:].obs,
+                    adata[keep_inds,:].obs_vector(gene_1),
+                    cmap='turbo',
+                    title=title,
+                    dsize=dsize,
+                    ax=ax,
+                    figure=fig,
+                    ticks=False,
+                    vmin=min_expr,
+                    vmax=max_expr
+                )
+                ax.set_ylabel(gene_1, fontsize=13)
+            elif col > row:
+                corrs, kept_inds, _ = plot_correlation(
+                    adata[keep_inds,:],
+                    gene_1, gene_2,
+                    sigma=sigma,
+                    contrib_thresh=contrib_thresh,
+                    kernel_matrix=None,
+                    row_key=row_key,
+                    col_key=col_key,
+                    condition=cond_key,
+                    cmap='RdBu_r',
+                    colorbar=False,
+                    ticks=False,
+                    ax=ax,
+                    figure=None,
+                    estimate=estimate_type,
+                    dsize=dsize,
+                    title=title
+                )
+            else:
+                ax.set_visible(False)
+
+    if fig_path:
+        plt.tight_layout()
+        fig.savefig(
+            fig_path,
+            format='pdf'
+        )
+        plt.show()
+
+
+def _compute_pairwise_corrs(
+        gene_pairs, 
+        adata, 
+        cond_key, 
+        sigma=5, 
+        row_key='row', 
+        col_key='col'
+    ):
+    gps = []
+    all_corrs = []
+    for g1, g2 in gene_pairs:
+        corrs, keep_inds = utils.compute_local_correlation(
+            adata, 
+            g1, g2,
+            kernel_matrix=None, 
+            row_key=row_key, 
+            col_key=col_key, 
+            condition=cond_key, 
+            sigma=sigma
+        )
+        gps.append((g1, g2))
+        all_corrs.append(corrs)    
+    return all_corrs
+
+
+def cluster_pairwise_correlations( 
+        plot_genes,
+        adata,
+        cond_key,
+        sigma=5,
+        row_key='row',
+        col_key='col',
+        color_thresh=19
+    ):
+
+    gene_pairs = []
+    for g1_i, g1 in enumerate(plot_genes):
+        for g2_i, g2 in enumerate(plot_genes):
+            if g1_i >= g2_i:
+                continue
+            gene_pairs.append((g1, g2))
+    gene_pairs = [
+        tuple(sorted(x)) 
+        for x in gene_pairs
+    ]
+
+    all_corrs = _compute_pairwise_corrs(
+        gene_pairs,
+        adata,
+        cond_key,
+        sigma=5,
+        row_key='row',
+        col_key='col'
+    )
+
+    pal = list(sns.color_palette("Set2").as_hex())
+
+    def plot_dendrogram(model, **kwargs):
+        # Create linkage matrix and then plot the dendrogram
+
+        # create the counts of samples under each node
+        counts = np.zeros(model.children_.shape[0])
+        n_samples = len(model.labels_)
+        for i, merge in enumerate(model.children_):
+            current_count = 0
+            for child_idx in merge:
+                if child_idx < n_samples:
+                    current_count += 1  # leaf node
+                else:
+                    current_count += counts[child_idx - n_samples]
+            counts[i] = current_count
+
+        linkage_matrix = np.column_stack([
+            model.children_, 
+            model.distances_,
+            counts
+        ]).astype(float)
+
+        # Plot the corresponding dendrogram
+        dendrogram(linkage_matrix, **kwargs)
+
+    fig, ax = plt.subplots(
+        1,
+        1,
+        figsize=(8,6)
+    )
+    # Setting distance_threshold=0 ensures we compute the full tree.
+    model = AgglomerativeClustering(
+        distance_threshold=0, 
+        n_clusters=None
+    )
+
+    model = model.fit(np.array(all_corrs).squeeze())
+    plt.title('Hierarchical Clustering Dendrogram')
+
+    set_link_color_palette(pal)
+
+    plot_dendrogram(
+        model, 
+        truncate_mode='level', 
+        p=6, 
+        labels=[', '.join(x) for x in gene_pairs], 
+        color_threshold=color_thresh, 
+        leaf_rotation=90, 
+        ax=ax, 
+        above_threshold_color='grey'
+    )
+    plt.show()
+
 
