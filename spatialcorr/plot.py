@@ -2,6 +2,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
+import math
 from collections import defaultdict
 import seaborn as sns
 from scipy.cluster.hierarchy import dendrogram, set_link_color_palette
@@ -196,7 +197,7 @@ def plot_ci_overlap(
         kernel_matrix,
         cond_key=cond_key,
         neigh_thresh=neigh_thresh,
-        bc_to_neighs=bc_to_neighs,
+        spot_to_neighs=bc_to_neighs,
         n_boots=100
     )
 
@@ -681,24 +682,43 @@ def mult_genes_plot_correlation(
                 )
                 ax.set_ylabel(gene_1, fontsize=13)
             elif col > row:
-                corrs, kept_inds, _ = plot_correlation(
-                    adata[keep_inds,:],
-                    gene_1, gene_2,
-                    sigma=sigma,
-                    contrib_thresh=contrib_thresh,
-                    kernel_matrix=None,
-                    row_key=row_key,
-                    col_key=col_key,
-                    condition=cond_key,
-                    cmap='RdBu_r',
-                    colorbar=False,
-                    ticks=False,
-                    ax=ax,
-                    figure=None,
-                    estimate=estimate_type,
-                    dsize=dsize,
-                    title=title
-                )
+                if estimate_type in ['local', 'regional']:
+                    corrs, kept_inds, _ = plot_correlation(
+                        adata[keep_inds,:],
+                        gene_1, gene_2,
+                        sigma=sigma,
+                        contrib_thresh=contrib_thresh,
+                        kernel_matrix=None,
+                        row_key=row_key,
+                        col_key=col_key,
+                        condition=cond_key,
+                        cmap='RdBu_r',
+                        colorbar=False,
+                        ticks=False,
+                        ax=ax,
+                        figure=None,
+                        estimate=estimate_type,
+                        dsize=dsize,
+                        title=title
+                    )
+                elif estimate_type == 'local_ci':
+                    plot_ci_overlap(
+                        gene_1,
+                        gene_2,
+                        adata,
+                        cond_key,
+                        kernel_matrix=None,
+                        sigma=sigma,
+                        row_key=row_key,
+                        col_key=col_key,
+                        title=None,
+                        ax=ax,
+                        figure=None,
+                        ticks=False,
+                        dsize=dsize,
+                        colorticks=None,
+                        neigh_thresh=contrib_thresh
+                    )
             else:
                 ax.set_visible(False)
 
@@ -821,3 +841,112 @@ def cluster_pairwise_correlations(
     plt.show()
 
 
+def plot_cluster_scatter(
+        gene_1, 
+        gene_2, 
+        adata, 
+        cond_key,
+        clust, 
+        col_vals=None, 
+        cmap=None, 
+        color=None, 
+        xlim=None, 
+        ylim=None, 
+        ax=None,
+        xlabel=None,
+        ylabel=None
+    ):
+    if ax is None:
+        fig, ax = plt.subplots(1,1, figsize=(3, 3)) 
+    ct_to_inds = defaultdict(lambda: [])
+    for ind, ct in enumerate(adata.obs[cond_key]):
+        ct_to_inds[ct].append(ind)
+    expr_1 = adata.obs_vector(gene_1)[ct_to_inds[clust]]
+    expr_2 = adata.obs_vector(gene_2)[ct_to_inds[clust]]
+    if col_vals is not None:
+        scatter_kws = {
+            'color': None,
+            'c': col_vals[ct_to_inds[clust]],
+            'cmap': cmap,
+            'alpha': 1.0
+        }
+        sns.regplot(expr_1, expr_2, scatter_kws=scatter_kws, ax=ax) 
+    elif color is not None:
+        scatter_kws = {
+            'color': color,
+            's': 5
+        }
+        sns.regplot(expr_1, expr_2, scatter_kws=scatter_kws, ax=ax) 
+    else:
+        sns.regplot(expr_1, expr_2)#, s=4)
+
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    
+    if xlim:
+        ax.set_xlim(xlim)
+    if ylim:
+        ax.set_ylim(ylim)
+
+
+def cluster_pairwise_scatterplots(
+        gene_1,
+        gene_2,
+        adata,
+        cond_key,
+        sigma=5,
+        row_key='row',
+        col_key='col'
+    ):
+
+    clusts = sorted(set(adata.obs[cond_key]))
+
+    n_cols = min([len(clusts), 5])
+    n_rows = math.ceil(len(clusts) / n_cols)
+
+    fig, axarr = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(2*n_cols, 2*n_rows)
+    )
+
+    ax_r = 0
+    ax_c = 0
+    for c_i, ct in enumerate(clusts):
+        if n_rows > 1:
+            ax = axarr[ax_r][ax_c]
+        else:
+            ax = axarr[ax_c]
+
+        ylabel = None
+        xlabel = None
+        if ax_c == 0:
+            ylabel = f'{gene_2} Expression'
+        if ax_r == n_rows-1:
+            xlabel = f'{gene_1} Expression'
+
+        plot_cluster_scatter(
+            gene_1, 
+            gene_2, 
+            adata, 
+            cond_key,
+            ct,
+            ax=ax,
+            col_vals=None, 
+            cmap=None, 
+            color=PALETTE_MANY[c_i], 
+            xlim=None, 
+            ylim=None,
+            xlabel=xlabel,
+            ylabel=ylabel
+        )
+
+        ax_c += 1
+        if ax_c >= n_cols:
+            ax_c = 0
+            ax_r += 1
+
+        ax.set_title(ct)
+    plt.tight_layout()
