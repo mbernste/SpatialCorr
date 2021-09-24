@@ -601,12 +601,14 @@ def _between_groups_test(
                 if n_nulls_great == sequential_n_greater:
                     hit_threshold = True
                     p_val = n_nulls_great / len(all_t_nulls)
-                    print(f"Number of nulls > obs has hit threshold of {sequential_n_greater}. Total permutations used: {len(all_t_nulls)}. P-value = {p_val}")
+                    if verbose >= 2:
+                        print(f"Number of nulls > obs has hit threshold of {sequential_n_greater}. Total permutations used: {len(all_t_nulls)}. P-value = {p_val}")
                     stop_monte_carlo = True
                     break
                 if len(all_t_nulls) >= (sequential_bail_out-1):
                     p_val = (n_nulls_great + 1) / sequential_bail_out
-                    print(f"Hit maximum permutations threshold of {sequential_n_greater}. P-value = {p_val}")
+                    if verbose >= 2:
+                        print(f"Hit maximum permutations threshold of {sequential_n_greater}. P-value = {p_val}")
                     stop_monte_carlo = True
                     break
         else:
@@ -900,21 +902,65 @@ def _within_groups_test(
 def run_test(
         adata,
         test_genes,
-        sigma,
+        bandwidth,
+        run_bhr=False,
         cond_key=None,
         contrib_thresh=10,
         row_key='row',
         col_key='col',
         verbose=1,
         n_procs=1,
-        test_between_conds=False,
-        compute_spotwise_pvals=False,
+        compute_spotwise_pvals=True,
         standardize_var=False,
         max_perms=10000,
         mc_pvals=True,
         spot_to_neighbors=None
     ):
+    """Run the SpatialDC statistical test to identify spatially varying
+    correlation for a given set of genes.
 
+    Parameters
+    ----------
+    adata : AnnData
+        spatial gene expression dataset with spatial coordinates
+        stored in `adata.obs`
+    test_genes : list
+        list of gene names for which to test for spatially varying
+        correlation
+    bandwidth : int
+        the kernel bandwidth used by the test
+    run_bhr: boolean, default: False
+        If False, run the WHR-test. If True, run the BHR-test
+    cond_key : string
+        the name of the column in `adata.obs` storing the cluster
+        assignments
+    contrib_thresh : integer, optional (default: 10)
+        threshold for the  total weight of all samples contributing
+        to the correlation estimate at each spot. Spots with total
+        weight less than this value will be filtered prior to running
+        the test
+    row_key : string, optional (default: 'row')
+        the name of the column in `adata.obs` storing the row coordinates
+        of each spot
+    col_key : string, optional (default: 'col')
+        the name of the column in `adata.obs` storing the column
+        coordinates of each spot
+    verbose : int, optional (default: 1)
+        the verbosity. Higher verbosity will lead to more debugging
+        information printed to standard output
+    n_procs : int, optional (default: 1)
+        number of processes to run in parallel
+    max_perms : int, optional (default: 10000)
+        Maximum number of permutations to compute for the permutation
+        test 
+    mc_pvals : boolean, optional (default: True)
+        If True, use Sequential Monte Carlo P-values. If False, use
+        `max_perms` number of permutations
+         
+    Returns
+    -------
+    self     
+    """
     # Extract expression data
     expr = np.array([
         adata.obs_vector(gene)
@@ -926,7 +972,7 @@ def run_test(
     # Compute kernel matrix
     kernel_matrix = _compute_kernel_matrix(
         adata.obs,
-        sigma=sigma,
+        sigma=bandwidth,
         cell_type_key=cond_key,
         condition_on_cell_type=condition,
         y_col=row_key,
@@ -958,7 +1004,7 @@ def run_test(
     for filt_ind, ct in enumerate(adata.obs.iloc[keep_inds][cond_key]):
         ct_to_indices_filt[ct].append(filt_ind)
 
-    if test_between_conds:
+    if run_bhr:
         assert condition
         p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals = _between_groups_test(
             expr,
@@ -1073,7 +1119,7 @@ def run_test_between_region_pairs(
                 for i, c in enumerate(contrib)
                 if c >= contrib_thresh
             ]
-            if verbose >= 1:
+            if verbose >= 2:
                 print('For cluster pair ({}, {}), kept {}/{} spots.'.format(
                     ct_1,
                     ct_2,
@@ -1107,40 +1153,87 @@ def run_test_between_region_pairs(
     return ct_to_ct_to_pval
    
 
-def est_corr_cis(g1, g2, ad, kernel_matrix, cond_key, neigh_thresh=10, bc_to_neighs=None, n_boots=100, mag=0):
-    expr_1 = ad.obs_vector(g1)
-    expr_2 = ad.obs_vector(g2)
-    if bc_to_neighs is None:
+def est_corr_cis(
+        g1, 
+        g2, 
+        adata, 
+        kernel_matrix, 
+        cond_key, 
+        spot_to_neighs=None,
+        neigh_thresh=10,
+        n_boots=100,
+        row_key='row',
+        col_key='col'
+    ):
+    """Run the SpatialDC statistical test to identify spatially varying
+    correlation for a given set of genes.
+
+    Parameters
+    ----------
+    gene_1: string
+        Name or id of first gene
+    gene_2: string 
+        Name or id of second gene
+    adata : AnnData
+        spatial gene expression dataset with spatial coordinates
+        stored in `adata.obs`
+    bandwidth : int
+        the kernel bandwidth used by the test
+    cond_key : string
+        the name of the column in `adata.obs` storing the cluster
+        assignments
+    spot_to_neighs: dict, optional (default: None)
+        a dictionary mapping each spot to a list of neighboring 
+        spots. If not provided, this will be computed automatically
+    neigh_thresh : integer, optional (default: 10)
+        threshold for the  total number of neighbors contributing
+        to the correlation estimate at each spot. Spots with total
+        neighbors less than this value will be filtered prior to running
+        the test
+    row_key : string, optional (default: 'row')
+        the name of the column in `adata.obs` storing the row coordinates
+        of each spot
+    col_key : string, optional (default: 'col')
+        the name of the column in `adata.obs` storing the column
+        coordinates of each spot
+    Returns
+    -------
+    self
+    """
+
+    expr_1 = adata.obs_vector(g1)
+    expr_2 = adata.obs_vector(g2)
+    if spot_to_neighs is None:
         row_col_to_barcode = spatialcorr.utils.map_row_col_to_barcode(
-            ad.obs,
-            row_key='row',
-            col_key='col'
+            adata.obs,
+            row_key=row_key,
+            col_key=col_key
         )
-        bc_to_neighs = spatialcorr.utils.compute_neighbors(
-            ad.obs,
+        spot_to_neighs = spatialcorr.utils.compute_neighbors(
+            adata.obs,
             row_col_to_barcode,
-            row_key='row',
-            col_key='col',
+            row_key=row_key,
+            col_key=col_key,
             rad=3
         )
     
     clust_to_bcs = defaultdict(lambda: set())
-    for bc, clust in zip(ad.obs.index, ad.obs[cond_key]):
+    for bc, clust in zip(adata.obs.index, adata.obs[cond_key]):
         clust_to_bcs[clust].add(bc)
                              
     bc_to_clust = {
         bc: clust
-        for bc, clust in zip(ad.obs.index, ad.obs[cond_key])
+        for bc, clust in zip(adata.obs.index, adata.obs[cond_key])
     }
     keep_inds = []
     bin_corrs = []
     bc_to_ind = {
         bc: bc_i
-        for bc_i, bc in enumerate(ad.obs.index)
+        for bc_i, bc in enumerate(adata.obs.index)
     }
     cis = []
-    for bc_i, bc in enumerate(ad.obs.index):
-        neighs = bc_to_neighs[bc]
+    for bc_i, bc in enumerate(adata.obs.index):
+        neighs = spot_to_neighs[bc]
         neighs = set(neighs) | set([bc]) # Add current spot
         curr_clust = bc_to_clust[bc]
         neighs = sorted(set(neighs) & clust_to_bcs[curr_clust])
