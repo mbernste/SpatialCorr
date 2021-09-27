@@ -831,7 +831,7 @@ def cluster_pairwise_correlations(
     plot_dendrogram(
         model, 
         truncate_mode='level', 
-        p=6, 
+        p=50, 
         labels=[', '.join(x) for x in gene_pairs], 
         color_threshold=color_thresh, 
         leaf_rotation=90, 
