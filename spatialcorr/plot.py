@@ -70,7 +70,7 @@ def plot_filtered_spots(
             cat.append('Kept')
         else:
             cat.append('Filtered')
-    cat_palette = ['grey', 'black']
+    cat_palette = ['#595959', '#d9d9d9']
     plot_slide(
         adata.obs,
         cat,
@@ -244,7 +244,19 @@ def plot_local_scatter(
         row_key='row', 
         col_key='col',
         cmap='RdBu_r',
-        neighb_color='black'
+        neighb_color='black',
+        plot_neigh=True,
+        width=10,
+        height=5,
+        line_color='black',
+        scatter_xlim=None,
+        scatter_ylim=None,
+        scatter_xlabel=None,
+        scatter_ylabel=None,
+        scatter_title=None,
+        fig_path=None,
+        fig_format='pdf',
+        fig_dpi=150,
     ):
     expr_1 = adata.obs_vector(gene_1)
     expr_2 = adata.obs_vector(gene_2)
@@ -288,61 +300,98 @@ def plot_local_scatter(
     indices = [barcodes_to_index[bc] for bc in bc_to_neighs[plot_bc]]
     indices.append(barcodes_to_index[plot_bc])
 
-    #if condition is not None:
-    #    # Map each group id to its indices
-    #    ct_to_inds = defaultdict(lambda: [])
-    #    for r_i, (bc, row) in enumerate(meta_df.iterrows()):
-    #        ct = row[condition]
-    #        ct_to_inds[ct].append(r_i)
-#
-#        # Filter indices based on group
-#        plot_ct = meta_df.loc[plot_bc][condition]
-#        keep_inds = ct_to_inds[plot_ct]
-#        indices = sorted(set(indices) & set(keep_inds))
-
     expr = np.array([expr_1, expr_2])
     sample_neigh = expr.T[indices]
 
-    figure, axarr = plt.subplots(
-        1,
-        2,
-        figsize=(10,5)
-    )
+    if plot_neigh:
+        figure, axarr = plt.subplots(
+            1,
+            2,
+            figsize=(width,height)
+        )
+    else:
+        figure, axarr = plt.subplots(
+            1,
+            1,
+            figsize=(width,height)
+        )
 
-    plot_neighborhood(
-        meta_df,
-        [plot_bc],
-        bc_to_neighs,
-        plot_vals,
-        ax=axarr[0],
-        dot_size=10,
-        vmin=vmin,
-        vmax=vmax,
-        cmap=cmap,
-        neighb_color=neighb_color,
-        row_key='row',
-        col_key='col'
-    )
+    if plot_neigh:
+        plot_neighborhood(
+            meta_df,
+            [plot_bc],
+            bc_to_neighs,
+            plot_vals,
+            ax=axarr[0],
+            dot_size=10,
+            vmin=vmin,
+            vmax=vmax,
+            cmap=cmap,
+            neighb_color=neighb_color,
+            row_key=row_key,
+            col_key=col_key
+        )
+    
+    if plot_neigh:
+        ax = axarr[1]
+    else:
+        ax = axarr
 
     if color_spots is not None:
         sns.regplot(
             x=sample_neigh.T[0],
             y=sample_neigh.T[1],
-            ax=axarr[1],
+            ax=ax,
             scatter_kws={
                 'color': None,
                 'c': color_spots[indices],
                 'cmap': 'viridis_r',
                 'vmin': 0,
                 'vmax': 1
-            }
+            },
+            line_kws={"color": line_color}
         )
     else:
         sns.regplot(
             x=sample_neigh.T[0], 
             y=sample_neigh.T[1], 
-            ax=axarr[1]
+            ax=ax,
+            scatter_kws={
+                'color': line_color,
+                'cmap': 'viridis_r',
+                'vmin': 0,
+                'vmax': 1
+            },
+            line_kws={
+                "color": line_color
+            }
         )
+
+    if scatter_xlabel:
+        ax.set_xlabel(scatter_xlabel)
+    else:
+        ax.set_xlabel(f'{gene_1} Expression')
+
+    if scatter_ylabel:
+        ax.set_ylabel(scatter_ylabel)
+    else:
+        ax.set_ylabel(f'{gene_2} Expression')
+
+    if scatter_xlim is not None:
+        ax.set_xlim(scatter_xlim)
+    if scatter_ylim is not None:
+        ax.set_ylim(scatter_ylim)
+    if scatter_title is not None:
+        ax.set_title(scatter_title)
+
+    if fig_path:
+        plt.tight_layout()
+        figure.savefig(
+            fig_path,
+            format=fig_format,
+            dpi=fig_dpi
+        )
+        plt.show()
 
 
 def _plot_correlation_local(
@@ -619,10 +668,12 @@ def mult_genes_plot_correlation(
         sigma=5,
         contrib_thresh=10,
         estimate_type='local',
+        row_key='row',
+        col_key='col',
         dsize=7,
         fig_path=None,
-        row_key='row',
-        col_key='col'
+        fig_format='png',
+        fig_dpi=150
     ):
     # Select all genes that are in the data
     plot_genes = [
@@ -726,7 +777,8 @@ def mult_genes_plot_correlation(
         plt.tight_layout()
         fig.savefig(
             fig_path,
-            format='pdf'
+            format=fig_format,
+            dpi=fig_dpi
         )
         plt.show()
 
@@ -763,7 +815,12 @@ def cluster_pairwise_correlations(
         sigma=5,
         row_key='row',
         col_key='col',
-        color_thresh=19
+        color_thresh=19,
+        title=None,
+        remove_y_ticks=False,
+        fig_path=None,
+        fig_format='png',
+        fig_dpi=150
     ):
 
     gene_pairs = []
@@ -815,7 +872,7 @@ def cluster_pairwise_correlations(
     fig, ax = plt.subplots(
         1,
         1,
-        figsize=(8,6)
+        figsize=(6,4)
     )
     # Setting distance_threshold=0 ensures we compute the full tree.
     model = AgglomerativeClustering(
@@ -824,8 +881,7 @@ def cluster_pairwise_correlations(
     )
 
     model = model.fit(np.array(all_corrs).squeeze())
-    plt.title('Hierarchical Clustering Dendrogram')
-
+    
     set_link_color_palette(pal)
 
     plot_dendrogram(
@@ -838,8 +894,25 @@ def cluster_pairwise_correlations(
         ax=ax, 
         above_threshold_color='grey'
     )
-    plt.show()
 
+    if title:
+        ax.set_title(title)
+
+    if remove_y_ticks:
+        ax.set_yticklabels([])
+        ax.set_yticks([])
+
+
+    plt.tight_layout()
+    plt.show()
+    if fig_path:
+        plt.tight_layout()
+        fig.savefig(
+            fig_path,
+            format=fig_format,
+            dpi=fig_dpi
+        )
+        plt.show()
 
 def plot_cluster_scatter(
         gene_1, 
@@ -870,13 +943,31 @@ def plot_cluster_scatter(
             'cmap': cmap,
             'alpha': 1.0
         }
-        sns.regplot(expr_1, expr_2, scatter_kws=scatter_kws, ax=ax) 
+        line_kws = {
+            'color': col_vals[ct_to_inds[clust]]
+        }
+        sns.regplot(
+            expr_1, 
+            expr_2, 
+            scatter_kws=scatter_kws, 
+            line_kws=line_kws, 
+            ax=ax
+        ) 
     elif color is not None:
         scatter_kws = {
             'color': color,
             's': 5
         }
-        sns.regplot(expr_1, expr_2, scatter_kws=scatter_kws, ax=ax) 
+        line_kws = {
+            'color': color
+        }
+        sns.regplot(
+            expr_1, 
+            expr_2, 
+            scatter_kws=scatter_kws, 
+            line_kws=line_kws, 
+            ax=ax
+        ) 
     else:
         sns.regplot(expr_1, expr_2)#, s=4)
 
@@ -898,7 +989,9 @@ def cluster_pairwise_scatterplots(
         cond_key,
         sigma=5,
         row_key='row',
-        col_key='col'
+        col_key='col',
+        xlim=None,
+        ylim=None
     ):
 
     clusts = sorted(set(adata.obs[cond_key]))
@@ -937,8 +1030,8 @@ def cluster_pairwise_scatterplots(
             col_vals=None, 
             cmap=None, 
             color=PALETTE_MANY[c_i], 
-            xlim=None, 
-            ylim=None,
+            xlim=xlim, 
+            ylim=ylim,
             xlabel=xlabel,
             ylabel=ylabel
         )
