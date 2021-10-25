@@ -134,10 +134,12 @@ def _permute_expression_cond_cell_type(X, ct_to_indices, n_perms):
         perms[:,indices,:] = ct_perms
     return perms
 
+
 def _chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
+
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
@@ -1053,7 +1055,8 @@ def run_test_between_region_pairs(
         max_perms=10000,
         mc_pvals=True,
         spot_to_neighbors=None,
-        run_regions=None
+        run_regions=None,
+        clust_size_lim=0
     ):
 
     # Filter spots with too little contribution 
@@ -1080,7 +1083,8 @@ def run_test_between_region_pairs(
     # Map each cell type to its indices
     ct_to_indices = defaultdict(lambda: [])
     for i, ct in enumerate(adata.obs[cond_key]):
-        ct_to_indices[ct].append(i)
+        if i in set(keep_inds):
+            ct_to_indices[ct].append(i)
 
     # If the regionst to run aren't specified, run on all pairs
     if run_regions is None:
@@ -1093,6 +1097,8 @@ def run_test_between_region_pairs(
                 continue
 
             clust_inds = list(ct_to_indices[ct_1]) + list(ct_to_indices[ct_2])
+            if len(ct_to_indices[ct_1]) < clust_size_lim or len(ct_to_indices[ct_2]) < clust_size_lim:
+                continue
             adata_clust = adata[clust_inds,:]
 
             # Extract expression data

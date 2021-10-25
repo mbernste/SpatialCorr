@@ -881,6 +881,17 @@ def compute_neighbors(
             )
     return bc_to_neighs
 
+
+def select_regions(adata, regions, cond_key):
+    keep_inds = [
+        ind
+        for ind, ct in zip(adata.obs.index, adata.obs[cond_key])
+        if ct in regions
+    ]
+    adata_copy = adata[keep_inds]
+    return adata_copy
+
+
 def main():
     coords = np.array([
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
