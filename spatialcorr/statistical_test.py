@@ -961,7 +961,12 @@ def run_test(
          
     Returns
     -------
-    self     
+    p_val: float
+        A permutation p-value for the log-likelihood ratio test
+    additional: dict
+        A dictionary of additional information computed during the test. If 
+        `run_bhr` is `False`, the region-specific p-values are located in
+        `additional['region_to_p_val']`
     """
     # Extract expression data
     expr = np.array([
@@ -1006,6 +1011,7 @@ def run_test(
     for filt_ind, ct in enumerate(adata.obs.iloc[keep_inds][cond_key]):
         ct_to_indices_filt[ct].append(filt_ind)
 
+    additional_info = {}
     if run_bhr:
         assert condition
         p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals = _between_groups_test(
@@ -1023,7 +1029,7 @@ def run_test(
             spot_to_neighbors=spot_to_neighbors
         )
     else:
-        p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals = _within_groups_test(
+        p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, ct_to_pval = _within_groups_test(
             expr,
             adata.obs,
             kernel_matrix,
@@ -1038,7 +1044,14 @@ def run_test(
             mc_pvals=mc_pvals,
             spot_to_neighbors=spot_to_neighbors
         )
-    return p_val, t_obs, t_nulls, keep_inds, obs_spot_lls, spotwise_t_nulls, spot_p_vals
+        additional_info['region_to_p_val'] = ct_to_pval
+    additonal.update({
+        'observed_log_likelihood_ratio': t_obs,
+        'permuted_log_likelihood_ratios': t_nulls,
+        'observed_spotwise_log_likelihood_ratios': obs_spot_lls,
+        'spotwise_t_nulls': spotwise_t_nulls
+    })
+    return p_val, additional #t_obs, t_nulls, keep_inds, obs_spot_lls, spotwise_t_nulls, spot_p_vals
 
 
 def run_test_between_region_pairs(

@@ -219,7 +219,7 @@ def analysis_pipeline_pair(
         neigh_thresh=contrib_thresh
     )
 
-    p_val, t_obs, t_nulls, kept_inds, obs_spot_lls, spotwise_t_nulls, clust_to_p_val = run_test(
+    p_val, additional = run_test(
         adata,
         [gene_1, gene_2],
         bandwidth,
@@ -234,30 +234,12 @@ def analysis_pipeline_pair(
         max_perms=max_perms,
         mc_pvals=False
     )
+    clust_to_p_val = additional['region_to_p_val']
     
     spot_p_vals = [
         clust_to_p_val[ct]
         for ct in adata.obs.iloc[kept_inds][cond_key]
     ]
-   
-
-    #cat_palette = ['grey', 'black']
-    #plot_slide(
-    #    adata.obs,
-    #    cat,
-    #    cmap='categorical',
-    #    colorbar=False,
-    #    vmin=None,
-    #    vmax=None,
-    #    title='Filtered Spots',
-    #    ax=ax,
-    #    figure=figure,
-    #    ticks=ticks,
-    #    dsize=dsize,
-    #    row_key=row_key,
-    #    col_key=col_key,
-    #    cat_palette=cat_palette
-    #)
 
     if only_stats:
         ax = axarr[1][0]
@@ -283,24 +265,6 @@ def analysis_pipeline_pair(
         col_key=col_key,
         cat_palette=['#d9d9d9', 'black']
     )
-
-
-    #plot_slide(
-    #    adata.obs.iloc[kept_inds],
-    #    -1 * np.log10(spot_p_vals),
-    #    cmap='viridis',
-    #    colorbar=False,
-    #    vmin=0,
-    #    vmax=-1 * np.log10(1/max_perms),
-    #    title=r'-$log_{10}$ WHR P-value',
-    #    ax=axarr[1][2],
-    #    figure=None,
-    #    ticks=False,
-    #    dsize=dsize,
-    #    colorticks=None,
-    #    row_key=row_key,
-    #    col_key=col_key
-    #)
     
     run_regions = [
         ct 
@@ -580,7 +544,7 @@ def analysis_pipeline_set(
         colorticks=None
     )
 
-    p_val, t_obs, t_nulls, kept_inds, obs_spot_lls, spotwise_t_nulls, clust_to_p_val = run_test(
+    p_val, additional = run_test(
         adata,
         genes,
         sigma,
@@ -596,6 +560,7 @@ def analysis_pipeline_set(
         mc_pvals=False,
         spot_to_neighbors=spot_to_neighbors_clust
     )
+    clust_to_p_val = additional['region_to_p_val']
 
     spot_p_vals = [
         clust_to_p_val[ct]
