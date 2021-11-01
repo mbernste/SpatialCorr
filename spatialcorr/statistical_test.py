@@ -79,13 +79,15 @@ def _compute_kernel_matrix(
         cell_type_key='cluster', 
         condition_on_cell_type=False,
         y_col='imagerow',
-        x_col='imagecol'
+        x_col='imagecol',
+        dist_matrix=None    
     ):
-    # Get pixel coordinates
-    coords = np.array(df[[y_col, x_col]])
+    if dist_matrix is None:
+        # Get pixel coordinates
+        coords = np.array(df[[y_col, x_col]])
 
-    # Euclidean distance matrix
-    dist_matrix = euclidean_distances(coords)
+        # Euclidean distance matrix
+        dist_matrix = euclidean_distances(coords)
 
     # Compute matrix conditioning on cell type
     if not condition_on_cell_type:
@@ -862,48 +864,12 @@ def _within_groups_test(
             for ct in ct_to_nulls
         }
     
-
-    #spot_p_vals = None
-    #if compute_spotwise_pvals:
-    #    # Create an NxP array where N is number of spots
-    #    # P is number of null samples where each row stores
-    #    # the null spotwise statistics for each spot.
-    #    # Because we may have more permutations than we used (due
-    #    # to computation of Monte-Carlo p-values), we restrict to 
-    #    # only number of permutations used.
-    #    all_spotwise_t_nulls = np.array(all_spotwise_t_nulls)[:len(all_t_nulls),:]
-    #    all_spotwise_t_nulls = all_spotwise_t_nulls.T
-    #    spot_neigh_t_nulls = []
-    #    obs_neight_lls = []
-    #    if spot_to_neighbors:
-    #        spot_to_index = {
-    #            spot: s_i
-    #            for s_i, spot in enumerate(df_filt.index)
-    #        }
-    #        for spot in df_filt.index:
-    #            neighs = set(spot_to_neighbors[spot]) | set([spot])
-    #            neigh_inds = [spot_to_index[x] for x in neighs if x in spot_to_index]
-    #            obs_neight_lls.append(np.sum(np.array(obs_spot_lls)[neigh_inds]))
-    #            spot_neigh_t_nulls.append(np.sum(all_spotwise_t_nulls[neigh_inds,:], axis=0))
-    #        spot_neigh_t_nulls = np.array(spot_neigh_t_nulls)
-    #        assert spot_neigh_t_nulls.shape == all_spotwise_t_nulls.shape
-    #
-    #        # Compute spot-wise p-values using neighborhood-summed log-likelihoods at each spot
-    #        spot_p_vals = []
-    #        for obs_spot_ll, null_spot_lls in zip(obs_neight_lls, spot_neigh_t_nulls):
-    #            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / (len(null_spot_lls)+1)
-    #            spot_p_vals.append(spot_p_val)
-    #    else:
-    #        spot_p_vals = []
-    #        for obs_spot_ll, null_spot_lls in zip(obs_spot_lls, all_spotwise_t_nulls):
-    #            spot_p_val = (len([x for x in null_spot_lls if x > obs_spot_ll])+1) / (len(null_spot_lls)+1) 
-    #            spot_p_vals.append(spot_p_val)
     return p_val, t_obs, t_nulls, obs_spot_lls, all_spotwise_t_nulls, ct_to_p_val
 
 
-def run_test(
+def run_tests(
         adata,
-        test_genes,
+        test_gene_sets,
         bandwidth,
         run_bhr=False,
         cond_key=None,
@@ -917,6 +883,54 @@ def run_test(
         max_perms=10000,
         mc_pvals=True,
         spot_to_neighbors=None
+    ):
+    # Run statistical test on each gene set
+    p_vals = []
+    additionals = []
+    for test_genes in test_gene_sets:
+        p_val, additional = run_test(
+            adata,
+            test_genes,
+            bandwidth,
+            run_bhr=run_bhr,
+            cond_key=cond_key,
+            contrib_thresh=contrib_thresh,
+            row_key=row_key,
+            col_key=col_key,
+            verbose=verbose,
+            n_procs=n_procs,
+            compute_spotwise_pvals=compute_spotwise_pvals,
+            standardize_var=standardize_var,
+            max_perms=10000,
+            mc_pvals=mc_pvas,
+            spot_to_neighbors=spot_to_neighbors
+        )
+        p_vals.append(p_val)
+        additionals.append(additional)
+
+    # Correct for multiple hypothesis testing
+    adj_p_vals = []
+
+    return p_vals, adj_p_vals, additionals
+
+def run_test(
+        adata,
+        test_genes,
+        bandwidth,
+        run_bhr=False,
+        cond_key=None,
+        contrib_thresh=10,
+        row_key='row',
+        col_key='col',
+        precomputed_kernel=None,
+        verbose=1,
+        n_procs=1,
+        compute_spotwise_pvals=True,
+        standardize_var=False,
+        max_perms=10000,
+        mc_pvals=True,
+        spot_to_neighbors=None,
+        alpha=0.05
     ):
     """Run the SpatialDC statistical test to identify spatially varying
     correlation for a given set of genes.
@@ -976,15 +990,26 @@ def run_test(
 
     condition = cond_key is not None
 
+    # Map each cell type to its indices in the full dataset
+    if condition:
+        ct_to_indices = defaultdict(lambda: [])
+        for i, ct in enumerate(adata.obs[cond_key]):
+            ct_to_indices[ct].append(i)
+    else:
+        ct_to_indices = {'all': np.arange(len(adata.obs))}
+
     # Compute kernel matrix
-    kernel_matrix = _compute_kernel_matrix(
-        adata.obs,
-        sigma=bandwidth,
-        cell_type_key=cond_key,
-        condition_on_cell_type=condition,
-        y_col=row_key,
-        x_col=col_key
-    )
+    if precomputed_kernel is None:
+        kernel_matrix = _compute_kernel_matrix(
+            adata.obs,
+            sigma=bandwidth,
+            cell_type_key=cond_key,
+            condition_on_cell_type=condition,
+            y_col=row_key,
+            x_col=col_key
+        )
+    else:
+        kernel_matrix = precomputed_kernel
 
     # Filter spots with too little contribution 
     # from neighbors
@@ -997,21 +1022,16 @@ def run_test(
     if verbose >= 1:
         print('Kept {}/{} spots.'.format(len(keep_inds), len(adata.obs)))
 
-    # Map each cell type to its indices in the full dataset
-    if condition:
-        ct_to_indices = defaultdict(lambda: [])
-        for i, ct in enumerate(adata.obs[cond_key]):
-            ct_to_indices[ct].append(i)
-    else:
-        ct_to_indices = {'all': np.arange(len(adata.obs))}
-
     # Mape each cell type to the its indices in the filtered
     # dataset
-    ct_to_indices_filt = defaultdict(lambda: [])
-    for filt_ind, ct in enumerate(adata.obs.iloc[keep_inds][cond_key]):
-        ct_to_indices_filt[ct].append(filt_ind)
+    if condition:
+        ct_to_indices_filt = defaultdict(lambda: [])
+        for filt_ind, ct in enumerate(adata.obs.iloc[keep_inds][cond_key]):
+            ct_to_indices_filt[ct].append(filt_ind)
+    else:
+        ct_to_indices_filt = {'all': keep_inds}
 
-    additional_info = {}
+    additional = {}
     if run_bhr:
         assert condition
         p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals = _between_groups_test(
@@ -1044,8 +1064,8 @@ def run_test(
             mc_pvals=mc_pvals,
             spot_to_neighbors=spot_to_neighbors
         )
-        additional_info['region_to_p_val'] = ct_to_pval
-    additonal.update({
+        additional['region_to_p_val'] = ct_to_pval
+    additional.update({
         'observed_log_likelihood_ratio': t_obs,
         'permuted_log_likelihood_ratios': t_nulls,
         'observed_spotwise_log_likelihood_ratios': obs_spot_lls,

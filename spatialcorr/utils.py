@@ -23,13 +23,14 @@ def compute_local_correlation(
             condition_on_cell_type=(not condition is None),
             cell_type_key=condition
         )
-        keep_inds = [
-            ind
-            for ind, contrib in enumerate(np.sum(kernel_matrix, axis=1))
-            if contrib >= contrib_thresh
-        ]
-        kernel_matrix = kernel_matrix[:,keep_inds]
-        kernel_matrix = kernel_matrix[keep_inds,:]
+
+    keep_inds = [
+        ind
+        for ind, contrib in enumerate(np.sum(kernel_matrix, axis=1))
+        if contrib >= contrib_thresh
+    ]
+    kernel_matrix = kernel_matrix[:,keep_inds]
+    kernel_matrix = kernel_matrix[keep_inds,:]
 
     # Filter the spots
     adata = adata[keep_inds,:]
@@ -81,6 +82,7 @@ def permute_coords(
         ct_perm = np.random.permutation(ct_coords)
         perms[indices] = ct_perm
     return perms
+
 
 def _add_neighbor(
         curr_bc, 
