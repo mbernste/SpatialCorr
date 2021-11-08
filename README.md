@@ -1,4 +1,4 @@
-# SpatialCorr: Identifying spatial correlation structure
+# SpatialCorr: Identifying spatially varying correlation 
   
 ![PyPI Version](https://img.shields.io/pypi/v/spatialcorr)
 
@@ -16,7 +16,7 @@ To install SpatialCorr using Pip, run the following command:
 
 ## Running SpatialCorr
 
-For a tutorial on running SpatialCorr, please see the [tutorial](). 
+For a tutorial on running SpatialCorr, please see the [tutorial](https://github.com/mbernste/spatialcorr/blob/main/tutorial/SpatialCorr_tutorial.ipynb). 
 
 For SpatialCorr's API manual, please visit the [documentation]().
 
