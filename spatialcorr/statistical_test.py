@@ -1,17 +1,9 @@
-import matplotlib as mpl  
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import pandas as pd
 import numpy as np
 import math
-import importlib
-import seaborn as sns
 from collections import defaultdict
 from multiprocessing import Process, Queue, Manager
 from sklearn.metrics.pairwise import euclidean_distances
-
-import matplotlib.cm
-from matplotlib.colors import ListedColormap
 
 
 def build_normal_log_pdf(mean, cov, cov_inv=None):
@@ -142,30 +134,6 @@ def _chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
-
-
-import matplotlib as mpl
-from matplotlib import pyplot as plt
-import seaborn as sns
-#import log_likelihood_ratio_test_plot as llrtp
-def plot_mvn(mean, covar, X, the_x, title=''):
-    color_iter = llrtp.PALETTE
-    fig, ax = plt.subplots(1,1, figsize=(5,5))
-
-    v, w = np.linalg.eigh(covar)
-    v = 2. * np.sqrt(2.) * np.sqrt(v)
-    u = w[0] / np.linalg.norm(w[0])
-
-    ax.scatter(X[:, 0], X[:, 1], .8, color='black')
-    ax.scatter([the_x[0]], [the_x[1]], 5., color='red')
-    # Plot an ellipse to show the Gaussian component
-    angle = np.arctan(u[1] / u[0])
-    angle = 180. * angle / np.pi  # convert to degrees
-    ell = mpl.patches.Ellipse(mean, v[0], v[1], 180. + angle, color='blue')
-    ell.set_clip_box(ax.bbox)
-    ell.set_alpha(0.2)
-    ax.add_artist(ell)
-    plt.show()
 
 
 def _worker_between(
