@@ -1,4 +1,4 @@
-# SpatialCorr: Identifying gene sets with spatiotemporally varying correlation structure &nbsp; <img src="https://raw.githubusercontent.com/deweylab/CellO/master/cello.png" alt="alt text" width="70px" height="70px">
+# SpatialCorr: Identifying spatial correlation structure
   
 ![PyPI Version](https://img.shields.io/pypi/v/spatialcorr)
 
