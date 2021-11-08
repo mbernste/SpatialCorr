@@ -6,7 +6,7 @@ Wrapper functions
 
 The following wrapper function creates plots to diagnose the spatial kernel used in SpatialDC's statistical tests.
 
-.. autofunction:: kernel_diagnostics
+.. autofunction:: spatialcorr.kernel_diagnostics
 
 It outputs the following multi-panel figure:
 
@@ -33,3 +33,12 @@ Statistical tests
 -----------------
 
 .. autofunction:: spatialcorr.run_test
+
+.. autofunction:: spatialcorr.run_test_between_region_pairs
+
+.. autofunction:: spatialcorr.est_corr_cis
+
+Datasets
+--------
+
+.. autofunction:: spatialcorr.load_dataset
