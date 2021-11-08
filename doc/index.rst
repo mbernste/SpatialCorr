@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-SpatialDC -- Analyze spatial gene expression correlation in Python 
+SpatialCorr -- Analyze spatial gene expression correlation in Python 
 ==================================================================
 
 .. toctree::
@@ -14,6 +14,6 @@ SpatialDC -- Analyze spatial gene expression correlation in Python
    api
 
 
-Spatial Differential Correlation (SpatialDC) is a set of statistical methods for identifying genes whose correlation structure changes across a spatial transcriptomics sample. Along with a set of statistical tests, SpatialDC also offers a number of methods for visualizing spatially varying correlation.
+SpatialCorr is a set of statistical methods for identifying genes whose correlation structure changes across a spatial transcriptomics sample. Along with a set of statistical tests, SpatialCorr also offers a number of methods for visualizing spatially varying correlation.
 
 
