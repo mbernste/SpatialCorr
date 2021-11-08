@@ -13,6 +13,7 @@ from sklearn.metrics.pairwise import euclidean_distances
 import matplotlib.cm
 from matplotlib.colors import ListedColormap
 
+
 def build_normal_log_pdf(mean, cov, cov_inv=None):
     if cov_inv is None:
         cov_inv = np.linalg.inv(cov)
@@ -664,8 +665,6 @@ def _between_groups_test(
     return p_val, t_obs, t_nulls, obs_spot_lls, all_spotwise_t_nulls, spot_p_vals
 
 
-
-
 def _within_groups_test(
         expr, 
         df, 
@@ -932,55 +931,55 @@ def run_test(
         spot_to_neighbors=None,
         alpha=0.05
     ):
-    """Run the SpatialDC statistical test to identify spatially varying
+    """Run the SpatialCorr statistical test to identify spatially varying
     correlation for a given set of genes.
 
     Parameters
     ----------
     adata : AnnData
-        spatial gene expression dataset with spatial coordinates
-        stored in `adata.obs`
+        Spatial gene expression dataset with spatial coordinates
+        stored in `adata.obs`.
     test_genes : list
-        list of gene names for which to test for spatially varying
-        correlation
+        List of gene names for which to test for spatially varying
+        correlation.
     bandwidth : int
-        the kernel bandwidth used by the test
+        The kernel bandwidth used by the test.
     run_bhr: boolean, default: False
         If False, run the WHR-test. If True, run the BHR-test
     cond_key : string
-        the name of the column in `adata.obs` storing the cluster
-        assignments
+        The name of the column in `adata.obs` storing the cluster
+        assignments.
     contrib_thresh : integer, optional (default: 10)
-        threshold for the  total weight of all samples contributing
+        Threshold for the  total weight of all samples contributing
         to the correlation estimate at each spot. Spots with total
         weight less than this value will be filtered prior to running
-        the test
+        the test.
     row_key : string, optional (default: 'row')
-        the name of the column in `adata.obs` storing the row coordinates
-        of each spot
+        The name of the column in `adata.obs` storing the row coordinates
+        of each spot.
     col_key : string, optional (default: 'col')
-        the name of the column in `adata.obs` storing the column
-        coordinates of each spot
+        The name of the column in `adata.obs` storing the column
+        coordinates of each spot.
     verbose : int, optional (default: 1)
-        the verbosity. Higher verbosity will lead to more debugging
-        information printed to standard output
+        The verbosity. Higher verbosity will lead to more debugging
+        information printed to standard output.
     n_procs : int, optional (default: 1)
-        number of processes to run in parallel
+        Number of processes to run in parallel.
     max_perms : int, optional (default: 10000)
         Maximum number of permutations to compute for the permutation
-        test 
+        test.,
     mc_pvals : boolean, optional (default: True)
         If True, use Sequential Monte Carlo P-values. If False, use
-        `max_perms` number of permutations
+        `max_perms` number of permutations.
          
     Returns
     -------
     p_val: float
-        A permutation p-value for the log-likelihood ratio test
+        A permutation p-value for the log-likelihood ratio test.
     additional: dict
         A dictionary of additional information computed during the test. If 
         `run_bhr` is `False`, the region-specific p-values are located in
-        `additional['region_to_p_val']`
+        `additional['region_to_p_val']`.
     """
     # Extract expression data
     expr = np.array([
@@ -1069,15 +1068,16 @@ def run_test(
         'observed_log_likelihood_ratio': t_obs,
         'permuted_log_likelihood_ratios': t_nulls,
         'observed_spotwise_log_likelihood_ratios': obs_spot_lls,
-        'spotwise_t_nulls': spotwise_t_nulls
+        'spotwise_t_nulls': spotwise_t_nulls,
+        'kept_inds': keep_inds
     })
-    return p_val, additional #t_obs, t_nulls, keep_inds, obs_spot_lls, spotwise_t_nulls, spot_p_vals
+    return p_val, additional
 
 
 def run_test_between_region_pairs(
         adata,
         test_genes,
-        sigma,
+        bandwidth,
         cond_key,
         contrib_thresh=10,
         row_key='row',
@@ -1091,13 +1091,61 @@ def run_test_between_region_pairs(
         run_regions=None,
         clust_size_lim=0
     ):
+    """Run the SpatialCorr BR-test between very pair of regions on the
+    slide.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial gene expression dataset with spatial coordinates
+        stored in `adata.obs`.
+    test_genes : list
+        List of gene names for which to test for spatially varying
+        correlation.
+    bandwidth : int
+        The kernel bandwidth used by the test.
+    cond_key : string
+        The name of the column in `adata.obs` storing the cluster
+        assignments.
+    contrib_thresh : integer, optional (default: 10)
+        Threshold for the  total weight of all samples contributing
+        to the correlation estimate at each spot. Spots with total
+        weight less than this value will be filtered prior to running
+        the test.
+    row_key : string, optional (default: 'row')
+        The name of the column in `adata.obs` storing the row coordinates
+        of each spot.
+    col_key : string, optional (default: 'col')
+        The name of the column in `adata.obs` storing the column
+        coordinates of each spot.
+    verbose : int, optional (default: 1)
+        The verbosity. Higher verbosity will lead to more debugging
+        information printed to standard output.
+    n_procs : int, optional (default: 1)
+        number of processes to run in parallel
+    standardize_var: Boolean (default: False)
+        If true, standardize the variance between regions (in additon
+        to the means) before running the BR-test.
+    max_perms : int, optional (default: 10000)
+        Maximum number of permutations to compute for the permutation
+        test.
+    mc_pvals : boolean, optional (default: True)
+        If True, use Sequential Monte Carlo P-values. If False, use
+        `max_perms` number of permutations.
+         
+    Returns
+    -------
+    reg_to_reg_to_pval: dictionary
+        A dictionary of dictionaries mapping each region-pair to its
+        pairwise BR-test p-value.
+    """
 
     # Filter spots with too little contribution 
     # from neighbors
     # Compute kernel matrix
     kernel_matrix = _compute_kernel_matrix(
         adata.obs,
-        sigma=sigma,
+        sigma=bandwidth,
         cell_type_key=cond_key,
         condition_on_cell_type=True,
         y_col=row_key,
@@ -1143,7 +1191,7 @@ def run_test_between_region_pairs(
             # Compute kernel matrix
             kernel_matrix_clust = _compute_kernel_matrix(
                 adata_clust.obs,
-                sigma=sigma,
+                sigma=bandwidth,
                 cell_type_key=cond_key,
                 condition_on_cell_type=True,
                 y_col=row_key,
@@ -1193,55 +1241,83 @@ def run_test_between_region_pairs(
    
 
 def est_corr_cis(
-        g1, 
-        g2, 
-        adata, 
-        kernel_matrix, 
-        cond_key, 
+        gene_1, 
+        gene_2, 
+        adata,
+        bandwidth,
+        cond_key,
+        precomputed_kernel=None,
+        confidence_interval=0.95,
         spot_to_neighs=None,
         neigh_thresh=10,
         n_boots=100,
         row_key='row',
         col_key='col'
     ):
-    """Run the SpatialDC statistical test to identify spatially varying
-    correlation for a given set of genes.
+    """Compute approximate confidence intervals around the kernel estimates 
+    of spot wise correlation.
 
     Parameters
     ----------
     gene_1: string
-        Name or id of first gene
+        Name or id of first gene.
     gene_2: string 
-        Name or id of second gene
+        Name or id of second gene.
     adata : AnnData
-        spatial gene expression dataset with spatial coordinates
-        stored in `adata.obs`
+        Spatial gene expression dataset with spatial coordinates
+        stored in `adata.obs`.
     bandwidth : int
-        the kernel bandwidth used by the test
+        The kernel bandwidth used for the kernel estimates of 
+        correlation at each spot.
     cond_key : string
-        the name of the column in `adata.obs` storing the cluster
-        assignments
+        The name of the column in `adata.obs` storing the cluster
+        assignments.
+    precomputed_kernel : Array (default: None)
+        An NxN array storing a precomputed kernel matrix, where N
+        is the number of spots. If `None` a kernel will be computed
+        using the `bandwidth` parameter and conditioning on `cond_key`.
+    confidence_interval : float (default: 0.95)
+        Confidence interval to compute for each spot.
     spot_to_neighs: dict, optional (default: None)
-        a dictionary mapping each spot to a list of neighboring 
-        spots. If not provided, this will be computed automatically
+        A dictionary mapping each spot to a list of neighboring 
+        spots. If not provided, this will be computed automatically.
     neigh_thresh : integer, optional (default: 10)
-        threshold for the  total number of neighbors contributing
+        Threshold for the  total number of neighbors contributing
         to the correlation estimate at each spot. Spots with total
         neighbors less than this value will be filtered prior to running
-        the test
+        the test.
     row_key : string, optional (default: 'row')
-        the name of the column in `adata.obs` storing the row coordinates
-        of each spot
+        The name of the column in `adata.obs` storing the row coordinates
+        of each spot.
     col_key : string, optional (default: 'col')
-        the name of the column in `adata.obs` storing the column
-        coordinates of each spot
+        The name of the column in `adata.obs` storing the column
+        coordinates of each spot.
+
     Returns
     -------
-    self
+    cis: list
+        A list of pairs, one for each kept spot after filtering, storing
+        the confidence interval boundaries.
+    keep_inds: list
+        A list of kept indices after applying the effective-neighbors 
+        threshold. The confidence intervals in `cis` correspond to these
+        spots.
     """
+    condition = cond_key is not None
+    if precomputed_kernel is None:
+        kernel_matrix = _compute_kernel_matrix(
+            adata.obs,
+            sigma=bandwidth,
+            cell_type_key=cond_key,
+            condition_on_cell_type=condition,
+            y_col=row_key,
+            x_col=col_key
+        )
+    else:
+        kernel_matrix = precomputed_kernel
 
-    expr_1 = adata.obs_vector(g1)
-    expr_2 = adata.obs_vector(g2)
+    expr_1 = adata.obs_vector(gene_1)
+    expr_2 = adata.obs_vector(gene_2)
     if spot_to_neighs is None:
         row_col_to_barcode = spatialcorr.utils.map_row_col_to_barcode(
             adata.obs,
@@ -1305,6 +1381,10 @@ def est_corr_cis(
             
             boot_corrs.append(corr_boot)
         boot_corrs = sorted(boot_corrs)
-        cis.append((boot_corrs[5], boot_corrs[95]))
-        
+        q1 = int(n_boots * (1.0 - confidence_interval))
+        q2 = int(n_boots * confidence_interval)
+        cis.append((boot_corrs[q1], boot_corrs[q2]))
+
     return cis, keep_inds
+
+

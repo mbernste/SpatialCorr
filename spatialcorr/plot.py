@@ -107,7 +107,10 @@ def plot_correlation(
         figure=None,
         dsize=10,
         estimate='local',
-        title=None
+        title=None,
+        spot_borders=False,
+        border_color='black',
+        border_size=0.3
     ):
     if estimate == 'local':
         corrs, keep_inds = _plot_correlation_local(
@@ -127,7 +130,10 @@ def plot_correlation(
             ax=ax,
             figure=figure,
             dsize=dsize,
-            title=title
+            title=title,
+            spot_borders=spot_borders,
+            border_color=border_color,
+            border_size=border_size
         )
         extra_data = {}
     elif estimate == 'regional':
@@ -146,7 +152,10 @@ def plot_correlation(
             ax=ax,
             figure=figure,
             dsize=dsize,
-            title=title
+            title=title,
+            spot_borders=spot_borders,
+            border_color=border_color,
+            border_size=border_size
         )
         extra_data={'region_to_corr': ct_to_corr}
     return corrs, keep_inds, extra_data
@@ -158,7 +167,7 @@ def plot_ci_overlap(
         adata,
         cond_key,
         kernel_matrix=None,
-        sigma=5,
+        bandwidth=5,
         row_key='row',
         col_key='col',
         title=None,
@@ -172,7 +181,7 @@ def plot_ci_overlap(
     if kernel_matrix is None:
         kernel_matrix = st._compute_kernel_matrix(
             adata.obs,
-            sigma=sigma,
+            sigma=bandwidth,
             y_col=row_key,
             x_col=col_key,
             condition_on_cell_type=(not cond_key is None),
@@ -194,7 +203,8 @@ def plot_ci_overlap(
     cis, keep_inds = st.est_corr_cis(
         gene_1, gene_2,
         adata,
-        kernel_matrix,
+        bandwidth=bandwidth,
+        precomputed_kernel=kernel_matrix,
         cond_key=cond_key,
         neigh_thresh=neigh_thresh,
         spot_to_neighs=bc_to_neighs,
@@ -412,7 +422,10 @@ def _plot_correlation_local(
         figure=None,
         dsize=10,
         estimate='local',
-        title=None
+        title=None,
+        spot_borders=True,
+        border_color='black',
+        border_size=0.3
     ):
     corrs, keep_inds = utils.compute_local_correlation(
         adata, 
@@ -446,7 +459,10 @@ def _plot_correlation_local(
         ticks=ticks,
         ax=ax,
         figure=figure,
-        title=title
+        title=title,
+        spot_borders=spot_borders,
+        border_color=border_color,
+        border_size=border_size
     )
     return corrs, keep_inds
 
@@ -466,7 +482,10 @@ def _plot_correlation_regional(
         ax=None,
         figure=None,
         dsize=10,
-        title=None
+        title=None,
+        spot_borders=False,
+        border_color='black',
+        border_size=0.3
     ):
     expr_1 = adata.obs_vector(gene_1)
     expr_2 = adata.obs_vector(gene_2)
@@ -506,10 +525,32 @@ def _plot_correlation_regional(
         ticks=ticks,
         ax=ax,
         figure=figure,
-        title=title
+        title=title,
+        spot_borders=spot_borders,
+        border_color=border_color,
+        border_size=border_size
     )
     keep_inds = list(range(adata.obs.shape[0]))
     return corrs, keep_inds, ct_to_corr
+
+
+def _plot_slide_one_color(
+        df,
+        color,
+        row_key='row',
+        col_key='col',
+        dsize=37,
+        ax=None
+    ):
+    if ax is None:
+        figure, ax = plt.subplots(
+            1,
+            1,
+            figsize=(5,5)
+        )
+    y = -1 * np.array(df[row_key])
+    x = df[col_key]
+    ax.scatter(x,y,c=color, s=dsize)
 
 
 def plot_slide(
@@ -527,7 +568,10 @@ def plot_slide(
         colorticks=None,
         row_key='row',
         col_key='col',
-        cat_palette=None
+        cat_palette=None,
+        spot_borders=False,
+        border_color='black',
+        border_size=0.3
     ):
     y = -1 * np.array(df[row_key])
     x = df[col_key]
@@ -543,6 +587,18 @@ def plot_slide(
             figsize=(width,5)
         )
 
+    #if spot_borders:
+    #    if border_size is None:
+    #        border_size = dsize+5
+    #    _plot_slide_one_color(
+    #        df,
+    #        border_color,
+    #        row_key=row_key,
+    #        col_key=col_key,
+    #        dsize=border_size,
+    #        ax=ax
+    #    )
+    
     if cmap == 'categorical':
         if cat_palette is None:
             pal = PALETTE_MANY 
@@ -561,11 +617,17 @@ def plot_slide(
             mpatches.Patch(color=pal[val_to_index[val]], label=val)
             for val in sorted(set(values))
         ]
-        ax.scatter(x,y,c=colors, s=dsize)
+        if spot_borders:
+            ax.scatter(x,y,c=colors, s=dsize, edgecolors=border_color, linewidths=border_size)
+        else:
+            ax.scatter(x,y,c=colors, s=dsize)
         if colorbar:
             ax.legend(handles=patches, bbox_to_anchor=(1.05, 1), loc='upper left',)
     else:
-        im = ax.scatter(x,y,c=values, cmap=cmap, s=dsize, vmin=vmin, vmax=vmax)
+        if spot_borders:
+            im = ax.scatter(x,y,c=values, cmap=cmap, s=dsize, vmin=vmin, vmax=vmax, edgecolors=border_color, linewidths=border_size)
+        else:
+            im = ax.scatter(x,y,c=values, cmap=cmap, s=dsize, vmin=vmin, vmax=vmax)
         if colorbar:
             if vmin is None or vmax is None:
                 figure.colorbar(im, ax=ax, ticks=colorticks)
@@ -665,7 +727,8 @@ def mult_genes_plot_correlation(
         plot_genes,
         adata,
         cond_key,
-        sigma=5,
+        bandwidth=5,
+        precomputed_kernel=None,
         contrib_thresh=10,
         estimate_type='local',
         row_key='row',
@@ -675,6 +738,20 @@ def mult_genes_plot_correlation(
         fig_format='png',
         fig_dpi=150
     ):
+
+    condition = cond_key is not None
+    if precomputed_kernel is None:
+        kernel_matrix = st._compute_kernel_matrix(
+            adata.obs,
+            sigma=bandwidth,
+            cell_type_key=cond_key,
+            condition_on_cell_type=condition,
+            y_col=row_key,
+            x_col=col_key
+        )
+    else:
+        kernel_matrix = precomputed_kernel
+
     # Select all genes that are in the data
     plot_genes = [
         gene for gene in plot_genes
@@ -691,13 +768,17 @@ def mult_genes_plot_correlation(
     corrs, keep_inds = utils.compute_local_correlation(
         adata,
         plot_genes[0], plot_genes[1],
-        kernel_matrix=None,
+        kernel_matrix=kernel_matrix,
         row_key=row_key,
         col_key=col_key,
         condition=cond_key,
-        sigma=sigma,
+        sigma=bandwidth,
         contrib_thresh=contrib_thresh
     )
+
+    # Filter kernel matrix, if it's provided
+    kernel_matrix = kernel_matrix[keep_inds,:]
+    kernel_matrix = kernel_matrix[:,keep_inds]
 
     # Get range of expression values for colormap
     # of expression
@@ -729,7 +810,9 @@ def mult_genes_plot_correlation(
                     figure=fig,
                     ticks=False,
                     vmin=min_expr,
-                    vmax=max_expr
+                    vmax=max_expr,
+                    row_key=row_key,
+                    col_key=col_key
                 )
                 ax.set_ylabel(gene_1, fontsize=13)
             elif col > row:
@@ -737,9 +820,9 @@ def mult_genes_plot_correlation(
                     corrs, kept_inds, _ = plot_correlation(
                         adata[keep_inds,:],
                         gene_1, gene_2,
-                        sigma=sigma,
+                        sigma=bandwidth,
                         contrib_thresh=contrib_thresh,
-                        kernel_matrix=None,
+                        kernel_matrix=kernel_matrix,
                         row_key=row_key,
                         col_key=col_key,
                         condition=cond_key,
@@ -759,7 +842,7 @@ def mult_genes_plot_correlation(
                         adata,
                         cond_key,
                         kernel_matrix=None,
-                        sigma=sigma,
+                        bandwidth=bandwidth,
                         row_key=row_key,
                         col_key=col_key,
                         title=None,
@@ -991,7 +1074,10 @@ def cluster_pairwise_scatterplots(
         row_key='row',
         col_key='col',
         xlim=None,
-        ylim=None
+        ylim=None,
+        fig_path=None,
+        fig_format='png',
+        fig_dpi=150
     ):
 
     clusts = sorted(set(adata.obs[cond_key]))
@@ -1042,4 +1128,19 @@ def cluster_pairwise_scatterplots(
             ax_r += 1
 
         ax.set_title(ct)
+
+    if ax_r < len(axarr)-1:
+        for ax_c in range(ax_c, n_cols):
+            axarr[ax_r][ax_c].set_visible(False)
+            axarr[ax_r - 1][ax_c].set_xlabel(f'{gene_1} Expression')
     plt.tight_layout()
+    
+    # Save figure
+    if fig_path:
+        plt.tight_layout()
+        fig.savefig(
+            fig_path,
+            format=fig_format,
+            dpi=fig_dpi
+        )
+        plt.show()

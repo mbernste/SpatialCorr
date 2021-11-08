@@ -27,13 +27,13 @@ def analysis_pipeline_pair(
         dpi=150,
         only_stats=False
     ):
-    """Run a SpatialDC analysis pipeline on a pair of genes.
+    """Run a SpatialCorr analysis pipeline on a pair of genes.
 
     This function will run the following analyses:
     1. Compute spotwise kernel estimates of correlation
     2. Compute confidence intervals (CIs) of correlation at each spot compute spots where CI does not overlap zero (i.e. putative regions with non-zero correlation)
-    3. For each cluster, compute a WHR P-value
-    4. Remove all clusters with WHR P-value < `reject_thresh` for BHR test and for remaining clusters, compute BHR P-value testing for differential correlation between the two clusters 
+    3. For each cluster, compute a WR P-value
+    4. Remove all clusters with WR P-value < `reject_thresh` for BHR test and for remaining clusters, compute BR P-value testing for differential correlation between the two clusters 
 
     Parameters
     ----------
@@ -207,7 +207,7 @@ def analysis_pipeline_pair(
         adata,
         cond_key=cond_key,
         kernel_matrix=None,
-        sigma=bandwidth,
+        bandwidth=bandwidth,
         row_key=row_key,
         col_key=col_key,
         title='Regions of non-zero\ncorrelation',
@@ -234,6 +234,7 @@ def analysis_pipeline_pair(
         max_perms=max_perms,
         mc_pvals=False
     )
+    kept_inds = additional['kept_inds']
     clust_to_p_val = additional['region_to_p_val']
     
     spot_p_vals = [
@@ -560,6 +561,7 @@ def analysis_pipeline_set(
         mc_pvals=False,
         spot_to_neighbors=spot_to_neighbors_clust
     )
+    kept_inds = additional['kept_inds']
     clust_to_p_val = additional['region_to_p_val']
 
     spot_p_vals = [
