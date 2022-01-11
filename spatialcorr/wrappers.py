@@ -4,7 +4,7 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 
-from .statistical_test  import run_test, run_test_between_region_pairs, _compute_kernel_matrix
+from .statistical_test  import run_test, run_test_between_region_pairs, compute_kernel_matrix
 from .plot import plot_slide, plot_correlation, plot_ci_overlap, plot_filtered_spots
 
 
@@ -33,7 +33,7 @@ def analysis_pipeline_pair(
     1. Compute spotwise kernel estimates of correlation
     2. Compute confidence intervals (CIs) of correlation at each spot compute spots where CI does not overlap zero (i.e. putative regions with non-zero correlation)
     3. For each cluster, compute a WR P-value
-    4. Remove all clusters with WR P-value < `reject_thresh` for BHR test and for remaining clusters, compute BR P-value testing for differential correlation between the two clusters 
+    4. Remove all clusters with WR P-value < `reject_thresh` for BR-test and for remaining clusters, compute BR P-value testing for differential correlation between the two clusters 
 
     Parameters
     ----------
@@ -57,7 +57,7 @@ def analysis_pipeline_pair(
         coordinates of each spot
     reject_thresh: float (default: 0.05)
         P-value threshold used to reject the null hypothesis for each
-        region's WHR test as well as region-pairwise BHR tests.
+        region's WR-test as well as region-pairwise BR-tests.
     dsize: int, optional (default: 12)
         the size of the dots in the scatterplot
     max_perms : int, optional (default: 500)
@@ -153,13 +153,13 @@ def analysis_pipeline_pair(
         )
 
         # Plot filtered spots
-        kernel_matrix = _compute_kernel_matrix(
+        kernel_matrix = compute_kernel_matrix(
             adata.obs,
-            sigma=bandwidth,
+            bandwidth=bandwidth,
             y_col=row_key,
             x_col=col_key,
-            condition_on_cell_type=(not cond_key is None),
-            cell_type_key=cond_key
+            condition_on_region=(not cond_key is None),
+            region_key=cond_key
         ) 
         plot_filtered_spots(
             adata,
@@ -182,7 +182,7 @@ def analysis_pipeline_pair(
         adata,
         gene_1,
         gene_2,
-        sigma=bandwidth,
+        bandwidth=bandwidth,
         contrib_thresh=contrib_thresh,
         row_key=row_key,
         col_key=col_key,
@@ -229,7 +229,7 @@ def analysis_pipeline_pair(
         col_key=col_key,
         verbose=verbose,
         n_procs=n_procs,
-        run_bhr=False,
+        run_br=False,
         compute_spotwise_pvals=True,
         max_perms=max_perms,
         mc_pvals=False
@@ -257,7 +257,7 @@ def analysis_pipeline_pair(
         colorbar=False,
         vmin=None,
         vmax=None,
-        title=f'WHR P-value < {reject_thresh}',
+        title=f'WR P-value < {reject_thresh}',
         ax=ax,
         figure=None,
         ticks=False,
@@ -288,7 +288,7 @@ def analysis_pipeline_pair(
     res = sns.heatmap(df_plot, cmap='Greys', cbar=False, ax=ax)
     for _, spine in res.spines.items():
         spine.set_visible(True)
-    ax.set_title(f'BHR P-value < {reject_thresh}')
+    ax.set_title(f'BR P-value < {reject_thresh}')
     ax.set_ylabel('Cluster')
     ax.set_xlabel('Cluster')
     
@@ -377,21 +377,21 @@ def kernel_diagnostics(
     )
 
     # Compute kernel matrices
-    kernel_matrix_no_cond = _compute_kernel_matrix(
+    kernel_matrix_no_cond = compute_kernel_matrix(
         adata.obs,
-        sigma=bandwidth,
+        bandwidth=bandwidth,
         y_col=row_key,
         x_col=col_key,
-        condition_on_cell_type=False,
-        cell_type_key=None
+        condition_on_region=False,
+        region_key=None
     )
-    kernel_matrix = _compute_kernel_matrix(
+    kernel_matrix = compute_kernel_matrix(
         adata.obs,
-        sigma=bandwidth,
+        bandwidth=bandwidth,
         y_col=row_key,
         x_col=col_key,
-        condition_on_cell_type=True,
-        cell_type_key=cond_key
+        condition_on_region=True,
+        region_key=cond_key
     )
 
     # Plot clusters
@@ -488,7 +488,7 @@ def analysis_pipeline_set(
         col_key='col',
         reject_thresh=0.05,
         dsize=12,
-        sigma=5,
+        bandwidth=5,
         max_perms=500,
         n_procs=5,
         test_between=False,
@@ -500,7 +500,7 @@ def analysis_pipeline_set(
     """
     reject_thresh: float (default: 0.05)
         P-value threshold used to reject the null hypothesis for each
-        region's WHR test as well as region-pairwise BHR tests.
+        region's WR-test as well as region-pairwise BR tests.
     """
     fig, axarr = plt.subplots(
         2,
@@ -524,13 +524,13 @@ def analysis_pipeline_set(
     )
 
     # Plot filtered spots
-    kernel_matrix = _compute_kernel_matrix(
+    kernel_matrix = compute_kernel_matrix(
         adata.obs,
-        sigma=sigma,
+        bandwidth=bandwidth,
         y_col=row_key,
         x_col=col_key,
-        condition_on_cell_type=(not cond_key is None),
-        cell_type_key=cond_key
+        condition_on_region=(not cond_key is None),
+        region_key=cond_key
     )
     plot_filtered_spots(
         adata,
@@ -548,14 +548,14 @@ def analysis_pipeline_set(
     p_val, additional = run_test(
         adata,
         genes,
-        sigma,
+        bandwidth,
         cond_key=cond_key,
         contrib_thresh=contrib_thresh,
         row_key=row_key,
         col_key=col_key,
         verbose=verbose,
         n_procs=n_procs,
-        run_bhr=test_between,
+        run_br=test_between,
         compute_spotwise_pvals=True,
         max_perms=max_perms,
         mc_pvals=False,
@@ -580,7 +580,7 @@ def analysis_pipeline_set(
         colorbar=False,
         vmin=None,
         vmax=None,
-        title=f'WHR P-value < {reject_thresh}',
+        title=f'WR P-value < {reject_thresh}',
         ax=axarr[0][1],
         figure=None,
         ticks=False,
@@ -597,7 +597,7 @@ def analysis_pipeline_set(
     #    colorbar=False,
     #    vmin=0,
     #    vmax=-1 * np.log10(1/max_perms),
-    #    title=r'-$log_{10}$ WHR P-value',
+    #    title=r'-$log_{10}$ WR P-value',
     #    ax=axarr[0][1],
     #    figure=None,
     #    ticks=False,
@@ -628,7 +628,7 @@ def analysis_pipeline_set(
     res = sns.heatmap(df_plot, cmap='Greys', cbar=False, ax=axarr[1][1])#, mask=mask)
     for _, spine in res.spines.items():
         spine.set_visible(True)
-    axarr[1][1].set_title('BHR P-value < 0.05')
+    axarr[1][1].set_title('BR P-value < 0.05')
     axarr[1][1].set_ylabel('Cluster')
     axarr[1][1].set_xlabel('Cluster')
 

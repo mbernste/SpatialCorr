@@ -93,7 +93,7 @@ def plot_correlation(
         adata, 
         gene_1, 
         gene_2, 
-        sigma=5, 
+        bandwidth=5, 
         contrib_thresh=10, 
         kernel_matrix=None, 
         row_key='row', 
@@ -117,7 +117,7 @@ def plot_correlation(
             adata,
             gene_1,
             gene_2,
-            sigma=sigma,
+            bandwidth=bandwidth,
             contrib_thresh=contrib_thresh,
             kernel_matrix=kernel_matrix,
             row_key=row_key, 
@@ -179,13 +179,13 @@ def plot_ci_overlap(
         neigh_thresh=10
     ):
     if kernel_matrix is None:
-        kernel_matrix = st._compute_kernel_matrix(
+        kernel_matrix = st.compute_kernel_matrix(
             adata.obs,
-            sigma=bandwidth,
+            bandwidth=bandwidth,
             y_col=row_key,
             x_col=col_key,
-            condition_on_cell_type=(not cond_key is None),
-            cell_type_key=cond_key
+            condition_on_region=(not cond_key is None),
+            region_key=cond_key
         )
 
     # Compute confidence intervals
@@ -408,7 +408,7 @@ def _plot_correlation_local(
         adata,
         gene_1,
         gene_2,
-        sigma=5,
+        bandwidth=5,
         contrib_thresh=10,
         kernel_matrix=None,
         row_key='row', 
@@ -435,7 +435,7 @@ def _plot_correlation_local(
         col_key=col_key, 
         kernel_matrix=kernel_matrix, 
         condition=condition, 
-        sigma=sigma,
+        bandwidth=bandwidth,
         contrib_thresh=contrib_thresh
     )
 
@@ -655,7 +655,7 @@ def plot_neighborhood(
         ticks=True,
         title=None,
         condition=False,
-        cell_type_key=None,
+        region_key=None,
         title_size=12,
         neighb_color='black',
         row_key='row',
@@ -667,7 +667,7 @@ def plot_neighborhood(
     for source in sources:
         neighbs = set(bc_to_neighbs[source])
         if condition:
-            ct_spots = set(df.loc[df[cell_type_key] == df.loc[source][cell_type_key]].index)
+            ct_spots = set(df.loc[df[region_key] == df.loc[source][region_key]].index)
             neighbs = neighbs & ct_spots
         all_neighbs.update(neighbs)
 
@@ -741,11 +741,11 @@ def mult_genes_plot_correlation(
 
     condition = cond_key is not None
     if precomputed_kernel is None:
-        kernel_matrix = st._compute_kernel_matrix(
+        kernel_matrix = st.compute_kernel_matrix(
             adata.obs,
-            sigma=bandwidth,
-            cell_type_key=cond_key,
-            condition_on_cell_type=condition,
+            bandwidth=bandwidth,
+            region_key=cond_key,
+            condition_on_region=condition,
             y_col=row_key,
             x_col=col_key
         )
@@ -772,7 +772,7 @@ def mult_genes_plot_correlation(
         row_key=row_key,
         col_key=col_key,
         condition=cond_key,
-        sigma=bandwidth,
+        bandwidth=bandwidth,
         contrib_thresh=contrib_thresh
     )
 
@@ -820,7 +820,7 @@ def mult_genes_plot_correlation(
                     corrs, kept_inds, _ = plot_correlation(
                         adata[keep_inds,:],
                         gene_1, gene_2,
-                        sigma=bandwidth,
+                        bandwidth=bandwidth,
                         contrib_thresh=contrib_thresh,
                         kernel_matrix=kernel_matrix,
                         row_key=row_key,
@@ -870,7 +870,7 @@ def _compute_pairwise_corrs(
         gene_pairs, 
         adata, 
         cond_key, 
-        sigma=5, 
+        bandwidth=5, 
         row_key='row', 
         col_key='col'
     ):
@@ -884,7 +884,7 @@ def _compute_pairwise_corrs(
             row_key=row_key, 
             col_key=col_key, 
             condition=cond_key, 
-            sigma=sigma
+            bandwidth=bandwidth
         )
         gps.append((g1, g2))
         all_corrs.append(corrs)    
@@ -895,13 +895,14 @@ def cluster_pairwise_correlations(
         plot_genes,
         adata,
         cond_key,
-        sigma=5,
+        bandwidth=5,
         row_key='row',
         col_key='col',
         color_thresh=19,
         title=None,
         remove_y_ticks=False,
         fig_path=None,
+        fig_size=(6,4),
         fig_format='png',
         fig_dpi=150
     ):
@@ -921,7 +922,7 @@ def cluster_pairwise_correlations(
         gene_pairs,
         adata,
         cond_key,
-        sigma=5,
+        bandwidth=5,
         row_key='row',
         col_key='col'
     )
@@ -955,7 +956,7 @@ def cluster_pairwise_correlations(
     fig, ax = plt.subplots(
         1,
         1,
-        figsize=(6,4)
+        figsize=fig_size
     )
     # Setting distance_threshold=0 ensures we compute the full tree.
     model = AgglomerativeClustering(
@@ -1070,7 +1071,7 @@ def cluster_pairwise_scatterplots(
         gene_2,
         adata,
         cond_key,
-        sigma=5,
+        bandwidth=5,
         row_key='row',
         col_key='col',
         xlim=None,

@@ -11,17 +11,17 @@ def compute_local_correlation(
         row_key='row', 
         col_key='col', 
         condition=None, 
-        sigma=5,
+        bandwidth=5,
         contrib_thresh=10
     ):
     if kernel_matrix is None:
-        kernel_matrix = st._compute_kernel_matrix(
+        kernel_matrix = st.compute_kernel_matrix(
             adata.obs,
-            sigma=sigma,
+            bandwidth=bandwidth,
             y_col=row_key,
             x_col=col_key,
-            condition_on_cell_type=(not condition is None),
-            cell_type_key=condition
+            condition_on_region=(not condition is None),
+            region_key=condition
         )
 
     keep_inds = [
@@ -44,7 +44,7 @@ def compute_local_correlation(
 
 
 def _estimate_correlations(kernel_matrix, expr_1, expr_2):
-    cov_mats = st.kernel_estimation(
+    cov_mats = st.covariance_kernel_estimation(
         kernel_matrix,
         np.array([expr_1, expr_2])
     )

@@ -1,12 +1,37 @@
+"""
+Functions implementing the WR and BR-tests in the SpatialCorr algorithm.
+
+Authors: Matthew Bernstein <mbernstein@morgridge.org>
+"""
+
 import pandas as pd
 import numpy as np
 import math
 from collections import defaultdict
-from multiprocessing import Process, Queue, Manager
+from multiprocessing import Process, Manager
 from sklearn.metrics.pairwise import euclidean_distances
-
+from statsmodels.stats.multitest import multipletests
 
 def build_normal_log_pdf(mean, cov, cov_inv=None):
+    """
+    A closure for creating a function that calculates the multivariate
+    normal (MVN) density function.
+
+    Parameters
+    ----------
+    mean: ndarray
+        N dimensional mean vector.
+    cov: ndarray 
+        NxN dimensional covariance matrix. 
+    cov_inv: ndarray
+        NxN dimensional precision matrix (the inverse of the covariance
+        matrix). If not, provided, it will be calculated automatically.
+
+    Returns
+    -------
+    normal_log_pdf: function
+        The MVN density function.
+    """
     if cov_inv is None:
         cov_inv = np.linalg.inv(cov)
     cov_det = np.abs(np.linalg.det(cov))
@@ -18,14 +43,24 @@ def build_normal_log_pdf(mean, cov, cov_inv=None):
     return normal_log_pdf
 
 
-def kernel_estimation(
-        kernel_matrix,
-        X,
-        verbose=10
-    ):
+def covariance_kernel_estimation(kernel_matrix, X):
     """
-    X
-        GxN matrix where G is number of genes and N is number of spots
+    Compute the kernel estimate of the covariance matrix at each spatial
+    location.
+
+    Parameters
+    ----------
+    kernel_matrix: ndarray
+        NxN matrix representing the spatial kernel (i.e., pairwise weights
+        between spatial locations)
+    X: ndarray
+        GxN expression matrix where G is number of genes and N is number of 
+        spots
+       
+    Returns
+    -------
+    all_covs: ndarray
+        NxGxG array storing the GxG covariance matrices at the N spots.
     """
     # For simplicity
     K = kernel_matrix
@@ -40,7 +75,8 @@ def kernel_estimation(
     
     # For each spot, compute the outer product of the deviation
     # vector with itself. These correspond to each term in the
-    # summation used to calculate dynamic covariance at each spot.
+    # summation used to calculate kernel estimated covariance at 
+    # each spot.
     O = np.array([np.outer(d,d) for d in devs])
 
     # This is a bit complicated. For a given spot i, to compute 
@@ -66,15 +102,46 @@ def kernel_estimation(
     return all_covs
 
 
-def _compute_kernel_matrix(
+def compute_kernel_matrix(
         df, 
-        sigma, 
-        cell_type_key='cluster', 
-        condition_on_cell_type=False,
-        y_col='imagerow',
-        x_col='imagecol',
+        bandwidth, 
+        region_key='cluster', 
+        condition_on_region=False,
+        y_col='row',
+        x_col='col',
         dist_matrix=None    
     ):
+    """
+    Compute the Gaussian kernel matrix between spots.
+
+    Parameters
+    ----------
+    df: DataFrame
+        A pandas DataFrame storing the coordinates of each spot.
+    bandwidth: float
+        The Gaussian kernel bandwidth parameter. Higher values increase the
+        size of the kernel.
+    region_key: string, optional (default: 'cluster')
+        The column in `df` storing the region annotations for ensuring that 
+        the kernel conditions on regions/clusters. Only used if `condition_on_region`
+        is True.
+    condition_on_region: boolean, optional (default: False)
+        If True, compute the kernel conditioned on regions stored in `region_key`.
+    y_col: string, optional (default: 'row') 
+        The column in `df` storing the y-coordinates for each spot.
+    x_col: string, optional (default: 'col') 
+        The column in `df' storing the x-coordinates for each spot.
+    dist_matrix: ndarray, optional (default: None)
+        An NxN matrix storing the pairwise distances between spots to be used as
+        input to the kernel. If `None`, Euclidean distances will be computed
+        automatically.
+
+    Returns
+    -------
+    kernel_matrix: ndarray
+        NxN array storing the pairwise weights between spots as computed by the
+        Gaussian kernel.
+    """
     if dist_matrix is None:
         # Get pixel coordinates
         coords = np.array(df[[y_col, x_col]])
@@ -83,19 +150,19 @@ def _compute_kernel_matrix(
         dist_matrix = euclidean_distances(coords)
 
     # Compute matrix conditioning on cell type
-    if not condition_on_cell_type:
+    if not condition_on_region:
         eta = np.full(dist_matrix.shape, 1)
     else:
         eta = []
-        for ct1 in df[cell_type_key]:
+        for ct1 in df[region_key]:
             r = []
-            for ct2 in df[cell_type_key]:
+            for ct2 in df[region_key]:
                 r.append(int(ct1 == ct2)) 
             eta.append(r)
         eta = np.array(eta)
 
     # Gaussian kernel matrix
-    kernel_matrix = np.exp(-1 * np.power(dist_matrix,2) / sigma**2)
+    kernel_matrix = np.exp(-1 * np.power(dist_matrix,2) / bandwidth**2)
     kernel_matrix = np.multiply(kernel_matrix, eta)
 
     return kernel_matrix
@@ -134,6 +201,33 @@ def _chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
+
+
+def _bh_region_pvals(ct_to_pval):
+    """
+    Adjust region-specific WR p-values using Benjamini Hochberg
+    (BH) to correct for testing multiple regions.
+
+    Parameters
+    ----------
+    ct_to_pval: dictionary
+        A dictionary mapping each region to its WR p-value
+
+    Returns
+    -------
+    ct_to_adj_pval: dictionary
+        A dictioanry mapping each region to its BH-adjusted
+        p-value.
+    """
+    ct_pvals = [(k,v) for k,v in ct_to_pval.items()]
+    cts = [x[0] for x in ct_pvals]
+    pvals = [x[1] for x in ct_pvals]
+    _, adj_pvals, _, _ = multipletests(pvals, alpha=0.05, method='fdr_bh')
+    ct_to_adj_pval = {
+        ct: adj
+        for ct, adj in zip(cts, adj_pvals)
+    }
+    return ct_to_adj_pval
 
 
 def _worker_between(
@@ -258,13 +352,12 @@ def compute_llrts_between(
     means = (np.matmul(kernel_matrix, expr.T).T / np.sum(kernel_matrix, axis=1)).T
     means_filt = means[keep_indices]
 
-    # Estimate covariance matrices using dynamic covariance
-    dyn_covs = kernel_estimation(
+    # Estimate covariance matrices using kernel estimation
+    kern_covs = covariance_kernel_estimation(
         kernel_matrix,
-        expr,
-        verbose=False
+        expr
     )
-    dyn_covs_filt = dyn_covs[keep_indices]
+    kern_covs_filt = kern_covs[keep_indices]
 
     # Compute Pearson correlation matrix for spots within each 
     # cell type under the alternative hypothesis that there is differential
@@ -292,7 +385,7 @@ def compute_llrts_between(
     
     # Compute alternative covariance matrices from correlations
     # and variances
-    alt_covs_filt = _adjust_covs_from_corrs(dyn_covs_filt, alt_corrs_filt)
+    alt_covs_filt = _adjust_covs_from_corrs(kern_covs_filt, alt_corrs_filt)
 
     # Build the inverse covariance matrices
     inv_alt_cov_mats_filt = np.array([
@@ -312,7 +405,7 @@ def compute_llrts_between(
     ]
 
     # Compute the null covariance matrices.
-    null_covs_filt = _adjust_covs_from_corrs(dyn_covs_filt, null_corrs_filt)
+    null_covs_filt = _adjust_covs_from_corrs(kern_covs_filt, null_corrs_filt)
 
     # Build the inverse covariance matrices
     inv_null_cov_mats_filt = np.array([
@@ -347,33 +440,38 @@ def compute_llrts_within(
         expr,
         kernel_matrix,
         null_corrs_filt,
-        keep_indices,
-        plot_ind=None
+        keep_indices
     ):
     """
     Parameters
     ----------
     df_filt
-        Dataframe with metadata for spots that we are keeping.
+        Dataframe with metadata for spots that are being kept after
+        the effective_neighbors filter was applied.
     expr
-        GxN matrix of expression where N is the total number of
-        spots, not just the kept spots.
+        GxN gene expression matrix where N is the total number of
+        spots, not just the kept spots post-filtering.
     kernel_matrix
-        NxN matrix of pair-wise weights between spots
-    null_corrs_filt
-        
+        NxN matrix of pairwise weights between spots for all spots,
+        not just the kept spots post-filtering.
+    null_corrs_filt: ndarray
+        FxGxG array storing the covariance matrices under the null
+        hypothesis for the F of N spots kept after applying the 
+        effective_neighbors filter.
+    keep_indices
+        The indices that were kept after effective_neighbors filter
+        was applied.
     """
     # Compute the local means
     means = (np.matmul(kernel_matrix, expr.T).T / np.sum(kernel_matrix, axis=1)).T
     means_filt = means[keep_indices]
 
-    # Estimate covariance matrices using dynamic covariance
-    dyn_covs = kernel_estimation(
+    # Estimate covariance matrices using kernel estimation
+    kern_covs = covariance_kernel_estimation(
         kernel_matrix,
-        expr,
-        verbose=False
+        expr
     )
-    dyn_covs_filt = dyn_covs[keep_indices]
+    kern_covs_filt = kern_covs[keep_indices]
 
     # Compute the null covariance matrix.
     # 'corr' is a Pearson correlation matrix 
@@ -381,7 +479,7 @@ def compute_llrts_within(
     # compute the new covariances based on the 
     # diagonal in 'cov' to match corr.
     null_covs_filt = []
-    for cov, corr in zip(dyn_covs_filt, null_corrs_filt):
+    for cov, corr in zip(kern_covs_filt, null_corrs_filt):
         varss = np.diag(cov)
         var_prods = np.sqrt(np.outer(varss, varss))
         new_cov = corr * var_prods
@@ -407,7 +505,7 @@ def compute_llrts_within(
     ]
   
     ll_alt_pdfs_filt = []
-    for s_i, (bc, mean, cov) in enumerate(zip(df_filt.index, means_filt, dyn_covs_filt)):
+    for s_i, (bc, mean, cov) in enumerate(zip(df_filt.index, means_filt, kern_covs_filt)):
         try:
             pdf = build_normal_log_pdf(mean, cov, np.linalg.inv(cov))
         except np.linalg.LinAlgError:
@@ -700,8 +798,7 @@ def _within_groups_test(
         expr,
         kernel_matrix,
         null_corrs_filt,
-        keep_indices,
-        plot_ind=67
+        keep_indices
     )
   
     # Observed statistic
@@ -838,7 +935,7 @@ def run_tests(
         adata,
         test_gene_sets,
         bandwidth,
-        run_bhr=False,
+        run_br=False,
         cond_key=None,
         contrib_thresh=10,
         row_key='row',
@@ -859,7 +956,7 @@ def run_tests(
             adata,
             test_genes,
             bandwidth,
-            run_bhr=run_bhr,
+            run_br=run_br,
             cond_key=cond_key,
             contrib_thresh=contrib_thresh,
             row_key=row_key,
@@ -876,15 +973,16 @@ def run_tests(
         additionals.append(additional)
 
     # Correct for multiple hypothesis testing
-    adj_p_vals = []
-
+    _, adj_p_vals, _, _ = multipletests(p_vals, alpha=0.05, method='fdr_bh')
+    
     return p_vals, adj_p_vals, additionals
+
 
 def run_test(
         adata,
         test_genes,
         bandwidth,
-        run_bhr=False,
+        run_br=False,
         cond_key=None,
         contrib_thresh=10,
         row_key='row',
@@ -912,7 +1010,7 @@ def run_test(
         correlation.
     bandwidth : int
         The kernel bandwidth used by the test.
-    run_bhr: boolean, default: False
+    run_br: boolean, default: False
         If False, run the WHR-test. If True, run the BHR-test
     cond_key : string
         The name of the column in `adata.obs` storing the cluster
@@ -946,8 +1044,9 @@ def run_test(
         A permutation p-value for the log-likelihood ratio test.
     additional: dict
         A dictionary of additional information computed during the test. If 
-        `run_bhr` is `False`, the region-specific p-values are located in
-        `additional['region_to_p_val']`.
+        `run_br` is `False`, the region-specific p-values are located in
+        `additional['region_to_p_val']`. The FDR-adjusted p-values (via 
+        Benjamini Hochberg) are stored in `additional['region_to_adj_p_val']`.
     """
     # Extract expression data
     expr = np.array([
@@ -967,11 +1066,11 @@ def run_test(
 
     # Compute kernel matrix
     if precomputed_kernel is None:
-        kernel_matrix = _compute_kernel_matrix(
+        kernel_matrix = compute_kernel_matrix(
             adata.obs,
-            sigma=bandwidth,
-            cell_type_key=cond_key,
-            condition_on_cell_type=condition,
+            bandwidth=bandwidth,
+            region_key=cond_key,
+            condition_on_region=condition,
             y_col=row_key,
             x_col=col_key
         )
@@ -999,7 +1098,7 @@ def run_test(
         ct_to_indices_filt = {'all': keep_inds}
 
     additional = {}
-    if run_bhr:
+    if run_br:
         assert condition
         p_val, t_obs, t_nulls, obs_spot_lls, spotwise_t_nulls, spot_p_vals = _between_groups_test(
             expr,
@@ -1032,6 +1131,9 @@ def run_test(
             spot_to_neighbors=spot_to_neighbors
         )
         additional['region_to_p_val'] = ct_to_pval
+        # Perform FDR correction for testing multiple regions
+        ct_to_adj_pval = _bh_region_pvals(ct_to_pval)
+        additional['region_to_adj_p_val'] =  ct_to_adj_pval
     additional.update({
         'observed_log_likelihood_ratio': t_obs,
         'permuted_log_likelihood_ratios': t_nulls,
@@ -1111,11 +1213,11 @@ def run_test_between_region_pairs(
     # Filter spots with too little contribution 
     # from neighbors
     # Compute kernel matrix
-    kernel_matrix = _compute_kernel_matrix(
+    kernel_matrix = compute_kernel_matrix(
         adata.obs,
-        sigma=bandwidth,
-        cell_type_key=cond_key,
-        condition_on_cell_type=True,
+        bandwidth=bandwidth,
+        region_key=cond_key,
+        condition_on_region=True,
         y_col=row_key,
         x_col=col_key
     )
@@ -1157,11 +1259,11 @@ def run_test_between_region_pairs(
             ]) 
 
             # Compute kernel matrix
-            kernel_matrix_clust = _compute_kernel_matrix(
+            kernel_matrix_clust = compute_kernel_matrix(
                 adata_clust.obs,
-                sigma=bandwidth,
-                cell_type_key=cond_key,
-                condition_on_cell_type=True,
+                bandwidth=bandwidth,
+                region_key=cond_key,
+                condition_on_region=True,
                 y_col=row_key,
                 x_col=col_key
             )
@@ -1273,11 +1375,11 @@ def est_corr_cis(
     """
     condition = cond_key is not None
     if precomputed_kernel is None:
-        kernel_matrix = _compute_kernel_matrix(
+        kernel_matrix = compute_kernel_matrix(
             adata.obs,
-            sigma=bandwidth,
-            cell_type_key=cond_key,
-            condition_on_cell_type=condition,
+            bandwidth=bandwidth,
+            region_key=cond_key,
+            condition_on_region=condition,
             y_col=row_key,
             x_col=col_key
         )
