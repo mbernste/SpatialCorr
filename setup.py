@@ -9,7 +9,8 @@ install_requires = [
     "anndata>=0.7.5"
     "scikit-learn>=0.24.2",
     "matplotlib",
-    "seaborn>=0.11.1"
+    "seaborn>=0.11.1",
+    "statsmodels>=0.12.2"
 ]
 
 if sys.version_info[:2] < (3, 7):
