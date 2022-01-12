@@ -38,6 +38,33 @@ Statistical tests
 
 .. autofunction:: spatialcorr.est_corr_cis
 
+
+Plotting functions
+------------------
+
+.. autofunction:: spatialcorr.plot.plot_correlation
+
+.. autofunction:: spatialcorr.plot.plot_filtered_spots
+
+.. autofunction:: spatialcorr.plot.plot_ci_overlap
+
+.. autofunction:: spatialcorr.plot.plot_local_scatter
+
+.. autofunction:: spatialcorr.plot.cluster_pairwise_correlations
+
+.. autofunction:: spatialcorr.plot.plot_slide
+
+Utility functions
+-----------------
+
+.. autofunction:: spatialcorr.compute_local_correlation
+
+.. autofunction:: spatialcorr.most_significant_pairs
+
+.. autofunction:: spatialcorr.compute_kernel_matrix
+
+.. autofunction:: spatialcorr.covariance_kernel_estimation
+
 Datasets
 --------
 

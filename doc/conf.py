@@ -19,9 +19,9 @@ sys.path.insert(0, os.path.abspath('../spatialcorr'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'SpatialDC'
-copyright = '2021, Matthew N. Bernstein, Aman Prasad, Zijian Ni, Jared Brown, Chitrasen Mohanty, Ron Stewart, Michael Newton, and Christina Kendziorski'
-author = 'Matthew N. Bernstein, Aman Prasad, Zijian Ni, Jared Brown, Chitrasen Mohanty, Ron Stewart, Michael Newton, and Christina Kendziorski'
+project = 'SpatialCorr'
+copyright = '2021, Matthew N. Bernstein, Zijian Ni, Aman Prasad, Jared Brown, Chitrasen Mohanty, Ron Stewart, Michael Newton, and Christina Kendziorski'
+author = 'Matthew N. Bernstein, Zijian Ni, Aman Prasad, Jared Brown, Chitrasen Mohanty, Ron Stewart, Michael Newton, and Christina Kendziorski'
 
 # -- General configuration ---------------------------------------------------
 
