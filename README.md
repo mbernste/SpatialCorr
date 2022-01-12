@@ -1,11 +1,14 @@
-# SpatialCorr: Identifying spatially varying correlation 
+# SpatialCorr: Analyzing spatially varying correlation 
   
 ![PyPI Version](https://img.shields.io/pypi/v/spatialcorr)
-
 
 ## About
 
 SpatialCorr is a set of statistical methods for identifying genes whose correlation structure changes across a spatial transcriptomics sample. Along with a set of statistical tests, SpatialCorr also offers a number of methods for visualizing spatially varying correlation.
+
+Here is a schematic overview of the analyses performed by SpatialCorr:
+
+![alt text](https://raw.githubusercontent.com/mbernste/spatialcorr/main/imgs/Overview_MainFigure_V3-01.png)
 
 For more details regarding the underlying method, see the paper: [(Paper forthcoming)]()
 
