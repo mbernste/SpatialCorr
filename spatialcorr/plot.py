@@ -56,9 +56,45 @@ def plot_filtered_spots(
         ax=None,
         figure=None,
         dsize=37,
-        ticks=True,
-        colorticks=None
+        ticks=True
     ):
+    """
+    Plot the slide with spots colored according to whether they would be filtered according
+    to the effective-neighbors filter. The effective-neighbors filter removes spots for which
+    the sum of the weights applied to neighboring spots, according to the Gaussian kernel, 
+    do not exceed a specified threshold.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial gene expression dataset with spatial coordinates
+        stored in `adata.obs`.
+    kernel_matrix : ndarray
+        NxN matrix representing the spatial kernel (i.e., pairwise weights
+        between spatial locations)
+    contrib_thresh : integer, optional (default: 10)
+        Threshold for the  total weight of all samples contributing
+        to the correlation estimate at each spot. Spots with total
+        weight less than this value will be filtered.
+    row_key : string, optional (default: 'row')
+        The name of the column in `adata.obs` storing the row coordinates
+        of each spot.
+    col_key : string, optional (default: 'col')
+        The name of the column in `adata.obs` storing the column
+        coordinates of each spot.
+    ax : Axis (default: None)
+        Draw plot on provided Matplotlib Axis.
+    figure : Figure (default : None)
+        Draw plot on provided Matplotlib Figure.
+    dsize : int (default : 37)
+        The size of the dots in the scatterplot.
+    ticks : boolean (default: True)
+        If True, show tickmarks along x and y axes indicated spatial coordinates.
+
+    Returns
+    -------
+    None
+    """
     # Filter spots with too little contribution
     # from neighbors
     contrib = np.sum(kernel_matrix, axis=1)
@@ -105,7 +141,6 @@ def plot_correlation(
         row_key='row', 
         col_key='col', 
         condition=None,
-        corr_magnitude=False,
         cmap='RdBu_r',
         colorbar=True,
         ticks=True,
@@ -118,6 +153,67 @@ def plot_correlation(
         border_color='black',
         border_size=0.3
     ):
+    """
+    Plot the slide with each spot colored by the correlation between two genes.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial gene expression dataset with spatial coordinates
+        stored in `adata.obs`.
+    gene_1 : string
+        The name or ID of the first gene.
+    gene_2 : string 
+        The name or ID of the second gene.
+    estimate : string (default : 'local')
+        One of {'local', 'regional'}. The estimation method used to estimate the
+        correlation at each spot. If 'local', use Gaussian kernel estimation. If 
+        'regional', use all of the spots in the given spot's histological region.
+    bandwidth : int (default : 5)
+        The kernel bandwidth used by the test. Only applied if `estimate` is set
+        to 'local'.
+    contrib_thresh : integer, optional (default: 10)
+        Threshold for the  total weight of all samples contributing
+        to the correlation estimate at each spot. Spots with total
+        weight less than this value will be filtered. Only applied if `estimate` 
+        is set to 'local'.
+    kernel_matrix : ndarray
+        NxN matrix representing the spatial kernel (i.e., pairwise weights
+        between spatial locations)
+    row_key : string, optional (default: 'row')
+        The name of the column in `adata.obs` storing the row coordinates
+        of each spot.
+    col_key : string, optional (default: 'col')
+        The name of the column in `adata.obs` storing the column
+        coordinates of each spot.
+    condition : string (default : None)
+        The name of the column in `adata.obs` storing the cluster
+        assignments.
+    cmap : string (default : 'RdBu_r')
+        The colormap to use to color the spots.
+    colorbar : boolean (default : True)
+        If True, plot the colorbar next to the figure.
+    ticks : boolean (default: True)
+        If True, show tickmarks along x and y axes indicated spatial coordinates.
+    dsize : int (default : 37)
+        The size of the dots in the scatterplot.
+    title : string (default : None)
+        The plot title.
+    spot_borders : boolean (default : False)
+        If True, draw a border line around each spot.
+    border_color : string (default : 'black')
+        The color of the border line around each spot. Only used if `spot_borders`
+        is True.
+    border_size : float (default : 0.3)
+        The thickness of the border line around each spot. Only used if `spot_borders`
+        is True.
+    ticks : boolean (default: True)
+        If True, show tickmarks along x and y axes indicated spatial coordinates.
+
+    Returns
+    -------
+    None
+    """
     if estimate == 'local':
         corrs, keep_inds = _plot_correlation_local(
             adata,
@@ -130,7 +226,6 @@ def plot_correlation(
             col_key=col_key, 
             condition=condition,
             cmap=cmap,
-            corr_magnitude=corr_magnitude,
             colorbar=colorbar,
             ticks=ticks,
             ax=ax,
@@ -152,7 +247,6 @@ def plot_correlation(
             row_key=row_key,
             col_key=col_key, 
             cmap=cmap,
-            corr_magnitude=corr_magnitude,
             colorbar=colorbar,
             ticks=ticks,
             ax=ax,
@@ -184,6 +278,53 @@ def plot_ci_overlap(
         colorticks=None,
         neigh_thresh=10
     ):
+    """
+    Plot the spots and color each spot whether the 95% confidence interval of the Guassian estimate
+    of correlation overlaps zero (computed using the bootstrap with 100 hundred sampels). A spot is 
+    colored red if the CI lies entirely above zero, blue if the CI lies entirely below zero, and grey 
+    if the CI overlaps zero.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial gene expression dataset with spatial coordinates
+        stored in `adata.obs`.
+    gene_1 : string
+        The name or ID of the first gene.
+    gene_2 : string 
+        The name or ID of the second gene.
+    kernel_matrix : ndarray, optional (default : None)
+        NxN matrix representing the spatial kernel (i.e., pairwise weights
+        between spatial locations)
+    bandwidth : int, optional (default : 5)
+        The kernel bandwidth used by the test. Only applied if `estimate` is set
+        to 'local'. Only applied if `kernel_matrix` is set to None.
+    neigh_thresh : integer, optional (default: 10)
+        Threshold for the  total number of neighbors contributing
+        to the correlation estimate at each spot. Spots with total
+        neighbors less than this value will be filtered prior to running
+        the test.
+    row_key : string, optional (default: 'row')
+        The name of the column in `adata.obs` storing the row coordinates
+        of each spot.
+    col_key : string, optional (default: 'col')
+        The name of the column in `adata.obs` storing the column
+        coordinates of each spot.
+    cond_key : string (default : None)
+        The name of the column in `adata.obs` storing the cluster
+        assignments.
+    ticks : boolean (default: True)
+        If True, show tickmarks along x and y axes indicated spatial coordinates.
+    dsize : int (default : 12)
+        The size of the dots in the scatterplot.
+    title : string (default : None)
+        The plot title.
+
+    Returns
+    -------
+    None
+    """
+
     if kernel_matrix is None:
         kernel_matrix = st.compute_kernel_matrix(
             adata.obs,
@@ -274,6 +415,74 @@ def plot_local_scatter(
         fig_format='pdf',
         fig_dpi=150,
     ):
+    """
+    Plot the spots colored according to some specified values and, for a given spot,
+    plot the expression scatterplot between two genes in the neighborhood of the given
+    spot. Also draws an ordinary least squares regression line atop this scatterplot.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial gene expression dataset with spatial coordinates
+        stored in `adata.obs`.
+    gene_1 : string
+        The name or ID of the first gene.
+    gene_2 : string
+        The name or ID of the second gene.
+    row : int
+        The row-coordinate to center the neighborhood.
+    col : int 
+        The column-coordinate to center the neighborhood.
+    plot_vals : ndarray
+        An N-length array of values used to color each spot where N is the total
+        number of spots (i.e., length of `adata`).
+    row_key : string, optional (default: 'row')
+        The name of the column in `adata.obs` storing the row coordinates
+        of each spot.
+    col_key : string, optional (default: 'col')
+        The name of the column in `adata.obs` storing the column
+        coordinates of each spot.
+    condition : string, optional (default : None)
+        The name of the column in `adata.obs` storing the cluster
+        assignments.
+    vmin : float, optional (default : None)
+        Minimum value used to color the spots (i.e., the lower limit of the colors).
+    vmax : float, optional (default : None)
+        Maximum value used to color the spots (i.e., the lower limit of the colors).
+    cmap : string, optional (default : 'RdBu_r')
+        The colormap to use to color the spots.
+    plot_neigh : boolean, optional (default : True)
+        If True, outline the spots that are included in the neighborhood.
+    neighb_color : string (default : 'black')
+        Color used to color the neighborhood of spots on the slide. Only applied 
+        if `plot_neigh` is True.
+    width : float, optional (default : 10)
+        Figure width.
+    height : float, optional (default : 5)
+        Figure height.
+    line_color : string, optional (default : black)
+        Color used for the regression line.
+    scatter_xlim : float, optional (default : None)
+        X-axis limits of regression plot.
+    scatter_ylim : float, optional (default : None)
+        Y-axis limits of regression plot.
+    scatter_xlabel : string, optional (default : None)
+        X-axis label for regression plot.
+    scatter_ylabel : string, optional (default : None)
+        Y-axis label for regression plot.
+    scatter_title : string, optional (default : None)
+        Title for regression plot.
+    fig_path :  string, optional (default : None)
+        Path to save figure as file.
+    fig_format : string, optional (default : 'pdf')
+        File format to save figure.
+    fig_dpi : string, optional (default : 150)
+        Resolution of figure.
+
+    Returns
+    -------
+    None
+    """
     expr_1 = adata.obs_vector(gene_1)
     expr_2 = adata.obs_vector(gene_2)
 
@@ -420,7 +629,6 @@ def _plot_correlation_local(
         row_key='row', 
         col_key='col', 
         condition=None,
-        corr_magnitude=False,
         cmap='RdBu_r',
         colorbar=True,
         ticks=True,
@@ -445,13 +653,8 @@ def _plot_correlation_local(
         contrib_thresh=contrib_thresh
     )
 
-    if corr_magnitude:
-        corrs = np.absolute(corrs)
-        vmin = 0
-        vmax = 1
-    else:
-        vmin = -1
-        vmax = 1
+    vmin = -1
+    vmax = 1
     plot_slide(
         adata.obs.iloc[keep_inds],
         corrs,
@@ -481,7 +684,6 @@ def _plot_correlation_regional(
         kernel_matrix=None,
         row_key='row',
         col_key='col',
-        corr_magnitude=False,
         cmap='RdBu_r',
         colorbar=True,
         ticks=True,
@@ -513,13 +715,8 @@ def _plot_correlation_regional(
         ct_to_corr[ct]
         for ct in adata.obs[condition]
     ])
-    if corr_magnitude:
-        corrs = np.absolute(corrs)
-        vmin = 0
-        vmax = 1
-    else:
-        vmin = -1
-        vmax = 1
+    vmin = -1
+    vmax = 1
     plot_slide(
         adata.obs, 
         corrs, 
