@@ -1,3 +1,9 @@
+"""
+Functions for loading prepackaged datasets
+
+Authors: Matthew Bernstein <mbernstein@morgridge.org>
+"""
+
 import pkg_resources as pr
 import json
 from os.path import join

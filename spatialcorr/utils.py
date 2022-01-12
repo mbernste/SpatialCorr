@@ -1,5 +1,12 @@
+"""
+Utility functions.
+
+Authors: Matthew Bernstein <mbernstein@morgridge.org>
+"""
+
 from collections import defaultdict
 import numpy as np
+import pandas as pd
 
 from . import statistical_test as st
 
@@ -14,6 +21,49 @@ def compute_local_correlation(
         bandwidth=5,
         contrib_thresh=10
     ):
+    """
+    Calculate the correlation at each spot using Guassian kernel estimation
+    for a pair of genes.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial gene expression dataset with spatial coordinates
+        stored in `adata.obs`.
+    gene_1 : string
+        The name or ID of the first gene.
+    gene_2 : string 
+        The name or ID of the second gene.
+    kernel_matrix : ndarray
+        An NxN matrix, where N is the number of spots, storing the value of the
+        Guassian kernel for each pair of spots.
+    row_key : string, optional (default: 'row')
+        The name of the column in `adata.obs` storing the row coordinates
+        of each spot.
+    col_key : string, optional (default: 'col')
+        The name of the column in `adata.obs` storing the column
+        coordinates of each spot.
+    condition : string (default: None)
+        The name of the column in `adata.obs` storing the histological region
+        of each spot that should be conditioned on by the Gaussian kernel.
+    bandwidth : int
+        The kernel bandwidth used by the test.
+    contrib_thresh : integer, optional (default: 10)
+        Threshold for the  total weight of all samples contributing
+        to the correlation estimate at each spot. Spots with total
+        weight less than this value will be filtered prior to running
+        the test (i.e., the effective-neighbors filter).
+         
+    Returns
+    -------
+    corrs: ndarray
+        An F-length array of correlation values storing the F spots kept 
+        after applying the effective-neighbors kernel.
+    keep_inds:
+        An F-lenght array of the indices of the original `adata` object
+        that were kept after applying the effective-neighbors kernel. The
+        values in `corrs` correspond to these spots.
+    """
     if kernel_matrix is None:
         kernel_matrix = st.compute_kernel_matrix(
             adata.obs,
@@ -41,6 +91,59 @@ def compute_local_correlation(
         adata.obs_vector(gene_2)
     ))
     return corrs, keep_inds
+
+
+def most_significant_pairs(additional):
+    """
+    Extract the most statistically significantly varying gene pairs from the results
+    SpatialCorr run on a gene set.
+
+    Parameters
+    ----------
+    additional: dictionary
+        A dictionary storing the "additional" results from a SpatialCorr run on a gene
+        set. Note, this dictionary must store the gene-pair test results (i.e., the results
+        of the test run on each individual pair of genes within the gene set), which can 
+        be obtained by running `spatialcorr.run_test`, with the `compute_gene_pair_pvals` 
+        argument set to True.
+
+    Returns
+    -------
+    df_top_pairs: DataFrame
+        A pandas DataFrame storing the gene-pairs ranked by their p-value under the
+        SpatialCorr test.
+    """
+    ERROR_STR = """
+    These SpatialCorr results do not contain an entry for `most_significant_pairs` that 
+    store the results of pairwise tests from a SpatialCorr run. Please run `spatialcorr.run_test`
+    with the argument `compute_gene_pair_pvals` set to True in order to retrieve an `additional`
+    object with the gene-pair results.
+    """
+    assert 'pairwise_results' in additional.keys(), ERROR_STR
+
+    # Extract relevant data
+    all_pairs = set()
+    for g1 in additional['pairwise_results'].keys():
+        for g2 in additional['pairwise_results'][g1].keys():
+            all_pairs.add(frozenset([g1, g2]))
+    all_pairs = [sorted(pair) for pair in all_pairs]
+
+    # Create dataframe
+    da = []
+    for pair in all_pairs:
+        g1, g2 = pair
+        pval = additional['pairwise_results'][g1][g2]['p_val']
+        adj_pval = additional['pairwise_results'][g1][g2]['adj_p_val']
+        da.append((','.join(pair), pval, adj_pval))
+    df_top_pairs = pd.DataFrame(
+        data=da,
+        columns=['Genes', 'P-value', 'Adj. P-value']
+    )
+    df_top_pairs = df_top_pairs.set_index('Genes')
+
+    # Sort by p-value
+    df_top_pairs = df_top_pairs.sort_values(by='P-value', ascending=True)
+    return df_top_pairs
 
 
 def _estimate_correlations(kernel_matrix, expr_1, expr_2):

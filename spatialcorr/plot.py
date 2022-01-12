@@ -1,3 +1,9 @@
+"""
+Functions for creating plots visualizing spatial correlation patterns.
+
+Authors: Matthew Bernstein <mbernstein@morgridge.org>
+"""
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches

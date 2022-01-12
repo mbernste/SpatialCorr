@@ -735,7 +735,6 @@ def _within_groups_test(
         expr, 
         df, 
         kernel_matrix, 
-        plot_lls=True, 
         verbose=False,
         n_procs=1,
         ct_to_indices=None,
@@ -952,6 +951,8 @@ def run_tests(
     p_vals = []
     additionals = []
     for test_genes in test_gene_sets:
+        if verbose >= 1:
+            print("Running test on genes: ", ', '.join(test_genes))
         p_val, additional = run_test(
             adata,
             test_genes,
@@ -965,9 +966,10 @@ def run_tests(
             n_procs=n_procs,
             compute_spotwise_pvals=compute_spotwise_pvals,
             standardize_var=standardize_var,
-            max_perms=10000,
-            mc_pvals=mc_pvas,
-            spot_to_neighbors=spot_to_neighbors
+            max_perms=max_perms,
+            mc_pvals=mc_pvals,
+            spot_to_neighbors=spot_to_neighbors,
+            compute_gene_pair_pvals=False
         )
         p_vals.append(p_val)
         additionals.append(additional)
@@ -995,7 +997,9 @@ def run_test(
         max_perms=10000,
         mc_pvals=True,
         spot_to_neighbors=None,
-        alpha=0.05
+        alpha=0.05,
+        compute_gene_pair_pvals=False,
+        gene_pair_perms=100
     ):
     """Run the SpatialCorr statistical test to identify spatially varying
     correlation for a given set of genes.
@@ -1119,7 +1123,6 @@ def run_test(
             expr,
             adata.obs,
             kernel_matrix,
-            plot_lls=False,
             ct_to_indices=ct_to_indices,
             ct_to_indices_filt=ct_to_indices_filt,
             verbose=verbose,
@@ -1134,6 +1137,8 @@ def run_test(
         # Perform FDR correction for testing multiple regions
         ct_to_adj_pval = _bh_region_pvals(ct_to_pval)
         additional['region_to_adj_p_val'] =  ct_to_adj_pval
+
+    # Update with additional data
     additional.update({
         'observed_log_likelihood_ratio': t_obs,
         'permuted_log_likelihood_ratios': t_nulls,
@@ -1141,6 +1146,43 @@ def run_test(
         'spotwise_t_nulls': spotwise_t_nulls,
         'kept_inds': keep_inds
     })
+
+    # Run the statistical test on each individual pair within this gene set using fewer 
+    # permutations.
+    pairs = []
+    for g1_i, g1 in enumerate(test_genes):
+        for g2_i, g2 in enumerate(test_genes):
+            if g2_i >= g1_i:
+                continue
+            pairs.append([g1, g2])
+    if compute_gene_pair_pvals:
+        p_vals, adj_p_vals, additionals = run_tests(
+            adata,
+            pairs,
+            bandwidth,
+            run_br=run_br,
+            cond_key=cond_key,
+            contrib_thresh=contrib_thresh,
+            row_key=row_key,
+            col_key=col_key,
+            verbose=verbose,
+            n_procs=n_procs,
+            compute_spotwise_pvals=True,
+            standardize_var=False,
+            max_perms=gene_pair_perms,
+            mc_pvals=False,
+            spot_to_neighbors=None
+        )
+        additional['pairwise_results'] = defaultdict(lambda: {})
+        for pair, pair_pval, pair_adj_pval, pair_additional in zip(pairs, p_vals, adj_p_vals, additionals):
+            pair_result = {
+                'p_val': pair_pval,
+                'adj_p_val': pair_adj_pval,
+                'additional': pair_additional
+            }
+            additional['pairwise_results'][pair[0]][pair[1]] = pair_result
+            additional['pairwise_results'][pair[1]][pair[0]] = pair_result
+            
     return p_val, additional
 
 
@@ -1244,7 +1286,7 @@ def run_test_between_region_pairs(
     ct_to_ct_to_pval = defaultdict(lambda: {})
     for ct_1_i, ct_1 in enumerate(sorted(run_regions)):
         for ct_2_i, ct_2 in enumerate(sorted(run_regions)):
-            if ct_2 >= ct_1:
+            if ct_2_i >= ct_1_i:
                 continue
 
             clust_inds = list(ct_to_indices[ct_1]) + list(ct_to_indices[ct_2])
@@ -1307,7 +1349,26 @@ def run_test_between_region_pairs(
 
             ct_to_ct_to_pval[ct_1][ct_2] = p_val
             ct_to_ct_to_pval[ct_2][ct_1] = p_val
-    return ct_to_ct_to_pval
+
+    # Compute Benjamini Hochberg adjusted p-values
+    ct_ct_p_vals = []
+    for ct_1_i, ct_1 in enumerate(sorted(run_regions)):
+        for ct_2_i, ct_2 in enumerate(sorted(run_regions)):
+            if ct_2_i >= ct_1_i:
+                continue
+            ct_ct_p_vals.append((
+                ct_1,
+                ct_2,
+                ct_to_ct_to_pval[ct_1][ct_2]
+            ))
+    pvals = [x[2] for x in ct_ct_p_vals]
+    _, adj_pvals, _, _ = multipletests(pvals, alpha=0.05, method='fdr_bh')
+    ct_to_ct_to_adj_pval = defaultdict(lambda: {})
+    for (ct_1, ct_2, pval), adj_pval in zip(ct_ct_p_vals, adj_pvals):
+        ct_to_ct_to_adj_pval[ct_1][ct_2] = adj_pval
+        ct_to_ct_to_adj_pval[ct_2][ct_1] = adj_pval
+
+    return ct_to_ct_to_pval, ct_to_ct_to_adj_pval
    
 
 def est_corr_cis(

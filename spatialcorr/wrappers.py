@@ -1,3 +1,10 @@
+"""
+Wrapper functions implementing high-level pipelines/workflows for analyzing
+and visualizing spatially varying correlation.
+
+Authors: Matthew Bernstein <mbernstein@morgridge.org>
+"""
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -650,7 +657,7 @@ def pairwise_clust_between(
         verbose=1,
         contrib_thresh=10
     ):
-    ct_to_ct_to_pval = run_test_between_region_pairs(
+    ct_to_ct_to_pval, ct_to_ct_to_adj_pval = run_test_between_region_pairs(
         adata,
         genes,
         5,
