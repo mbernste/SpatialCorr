@@ -1,8 +1,8 @@
 API
 ===
 
-Wrapper functions
------------------
+Pre-build pipelines
+-------------------
 
 The following wrapper function creates plots to diagnose the spatial kernel used in SpatialCorr's statistical tests.
 
@@ -51,8 +51,8 @@ Statistical tests
 .. autofunction:: spatialcorr.est_corr_cis
 
 
-Plotting functions
-------------------
+Plotting
+--------
 
 .. autofunction:: spatialcorr.plot.plot_correlation
 
@@ -62,8 +62,18 @@ Plotting functions
 
 .. autofunction:: spatialcorr.plot.plot_local_scatter
 
+.. raw:: html
+
     <p align="center">
     <img src="https://raw.githubusercontent.com/mbernste/spatialcorr/main/doc/_static/img/KRT16_KRT6B_local_correlation_scatter.png"/>
+    </p>
+
+.. autofunction:: spatialcorr.plot.region_scatterplots
+
+.. raw:: html
+
+    <p align="center">
+    <img src="https://raw.githubusercontent.com/mbernste/spatialcorr/main/doc/_static/img/KRT17_KRT6B_region_scatters.png"/>
     </p>
 
 .. autofunction:: spatialcorr.plot.cluster_pairwise_correlations
@@ -84,7 +94,7 @@ Plotting functions
 
 .. autofunction:: spatialcorr.plot.plot_slide
 
-Utility functions
+Helper functions
 -----------------
 
 .. autofunction:: spatialcorr.compute_local_correlation

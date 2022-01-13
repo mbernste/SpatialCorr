@@ -406,6 +406,7 @@ def plot_local_scatter(
         plot_neigh=True,
         width=10,
         height=5,
+        dsize=15,
         line_color='black',
         scatter_xlim=None,
         scatter_ylim=None,
@@ -461,6 +462,8 @@ def plot_local_scatter(
         Figure width.
     height : float, optional (default : 5)
         Figure height.
+    dsize : float, optional (default : 15)
+        Size of each spot.
     line_color : string, optional (default : black)
         Color used for the regression line.
     scatter_xlim : float, optional (default : None)
@@ -549,7 +552,7 @@ def plot_local_scatter(
             bc_to_neighs,
             plot_vals,
             ax=axarr[0],
-            dot_size=10,
+            dot_size=dsize,
             vmin=vmin,
             vmax=vmax,
             cmap=cmap,
@@ -1396,12 +1399,11 @@ def plot_cluster_scatter(
         ax.set_ylim(ylim)
 
 
-def cluster_pairwise_scatterplots(
+def region_scatterplots(
         gene_1,
         gene_2,
         adata,
         cond_key,
-        bandwidth=5,
         row_key='row',
         col_key='col',
         xlim=None,
@@ -1410,6 +1412,44 @@ def cluster_pairwise_scatterplots(
         fig_format='png',
         fig_dpi=150
     ):
+    """
+    For a given pair of genes, plot the scatterplot of expression values of these
+    two genes for each histological region.
+    
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial gene expression dataset with spatial coordinates
+        stored in `adata.obs`.
+    gene_1 : string
+        The name or ID of the first gene.
+    gene_2 : string
+        The name or ID of the second gene.
+    cond_key : string, optional (default : None)
+        The name of the column in `adata.obs` storing the cluster assignments.
+    row_key : string, optional (default : 'row')
+        The name of the column in `adata.obs` storing the row coordinates of each spot.
+    col_key : string, optional (default : 'col')
+        The name of the column in `adata.obs` storing the column coordinates of each
+        spot.
+    cond_key : string, optional (default : None)
+        The name of the column in `adata.obs` storing the cluster assignments.
+    xlim : tuple, optional (default: None)
+        The x-axis limits for each scatterplot.
+    ylim : tuple, optional (default: None)
+        The y-axis limits for each scatterplot.
+    fig_path : string, optional (default : None)
+        The path to the file to which to save the figure.
+    fig_format : string, optional (default : 'pdf')
+        File format to save figure.
+    fig_dpi : string, optional (default : 150)
+        Resolution of figure.
+
+    Returns
+    ------
+    None
+    """
+
 
     clusts = sorted(set(adata.obs[cond_key]))
 
