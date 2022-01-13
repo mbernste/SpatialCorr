@@ -28,6 +28,18 @@ It outputs the following multi-panel figure:
     <img src="https://raw.githubusercontent.com/mbernste/spatialcorr/main/doc/_static/img/KRT16_KRT6B_analysis.png"/>
     </p>
 
+The following wrapper function implements a full analysis pipeline for investigating spatially varying correlation between a set of genes.
+
+.. autofunction:: spatialcorr.analysis_pipeline_set
+
+It outputs the following multi-panel figure:
+
+.. raw:: html
+
+    <p align="center">
+    <img src="https://raw.githubusercontent.com/mbernste/spatialcorr/main/doc/_static/img/keratin_gene_set_analysis.png"/>
+    </p>
+
 
 Statistical tests
 -----------------
