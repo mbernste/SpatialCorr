@@ -62,6 +62,10 @@ Plotting functions
 
 .. autofunction:: spatialcorr.plot.plot_local_scatter
 
+    <p align="center">
+    <img src="https://raw.githubusercontent.com/mbernste/spatialcorr/main/doc/_static/img/KRT16_KRT6B_local_correlation_scatter.png"/>
+    </p>
+
 .. autofunction:: spatialcorr.plot.cluster_pairwise_correlations
 
 .. raw:: html
