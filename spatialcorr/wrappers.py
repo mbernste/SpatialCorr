@@ -86,6 +86,7 @@ def analysis_pipeline_pair(
         Format of the output figure file.
     dpi: int (default: 150)
         Resolution of output image.
+
     Returns
     -------
     None
@@ -177,8 +178,7 @@ def analysis_pipeline_pair(
             ax=axarr[1][1],
             figure=None,
             dsize=dsize,
-            ticks=False,
-            colorticks=None
+            ticks=False
         )
    
     if only_stats:
@@ -479,8 +479,7 @@ def kernel_diagnostics(
         ax=axarr[1][1],
         figure=None,
         dsize=dsize,
-        ticks=False,
-        colorticks=None
+        ticks=False
     )
 
     plt.tight_layout()
@@ -498,16 +497,68 @@ def analysis_pipeline_set(
         bandwidth=5,
         max_perms=500,
         n_procs=5,
-        test_between=False,
+        run_br=False,
         spot_to_neighbors=None,
         spot_to_neighbors_clust=None,
         contrib_thresh=10,
-        verbose=1
+        verbose=1,
+        fig_path=None,
+        fig_format='pdf',
+        dpi=150
     ):
     """
+    Run a SpatialCorr analysis pipeline on a set of genes.
+
+    This function will run the following analyses:
+    1. For each cluster, compute a WR P-value
+    2. Remove all clusters with WR P-value < `reject_thresh` for BR-test and for remaining clusters, compute BR P-value testing for differential correlation between the two clusters
+
+    Parameters
+    ----------
+    genes: List
+        List of genes in the gene set
+    adata : AnnData
+        spatial gene expression dataset with spatial coordinates
+        stored in `adata.obs`
+    bandwidth : int
+        the kernel bandwidth used by the test
+    cond_key : string
+        the name of the column in `adata.obs` storing the cluster
+        assignments
+    row_key : string, optional (default: 'row')
+        the name of the column in `adata.obs` storing the row coordinates
+        of each spot
+    col_key : string, optional (default: 'col')
+        the name of the column in `adata.obs` storing the column
+        coordinates of each spot
     reject_thresh: float (default: 0.05)
         P-value threshold used to reject the null hypothesis for each
-        region's WR-test as well as region-pairwise BR tests.
+        region's WR-test as well as region-pairwise BR-tests.
+    dsize: int, optional (default: 12)
+        the size of the dots in the scatterplot
+    max_perms : int, optional (default: 500)
+        Maximum number of permutations to compute for the permutation
+        test
+    n_procs : int, optional (default: 1)
+        number of processes to run in parallel
+    verbose : int, optional (default: 1)
+        the verbosity. Higher verbosity will lead to more debugging
+        information printed to standard output
+    contrib_thresh : int, optional (default: 10)
+        threshold for the  total weight of all samples contributing
+        to the correlation estimate at each spot. Spots with total
+        weight less than this value will be filtered prior to running
+        the test
+    fig_path: string, optional (default: None)
+        Path to write figure image.
+    fig_format: string, {'pdf', 'png'} (default: 'pdf')
+        Format of the output figure file.
+    dpi: int (default: 150)
+        Resolution of output image.
+
+    Returns
+    -------
+    None
     """
     fig, axarr = plt.subplots(
         2,
@@ -548,8 +599,7 @@ def analysis_pipeline_set(
         ax=axarr[1][0],
         figure=None,
         dsize=dsize,
-        ticks=False,
-        colorticks=None
+        ticks=False
     )
 
     p_val, additional = run_test(
@@ -562,7 +612,7 @@ def analysis_pipeline_set(
         col_key=col_key,
         verbose=verbose,
         n_procs=n_procs,
-        run_br=test_between,
+        run_br=run_br,
         compute_spotwise_pvals=True,
         max_perms=max_perms,
         mc_pvals=False,
@@ -642,7 +692,9 @@ def analysis_pipeline_set(
     #axarr[1][3].set_visible(False)
     
     plt.tight_layout()
-
+    plt.tight_layout()
+    if fig_path is not None:
+        fig.savefig(fig_path, format=fig_format, dpi=dpi)
 
 
 def pairwise_clust_between(
