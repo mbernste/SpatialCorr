@@ -985,51 +985,6 @@ def mult_genes_plot_correlation(
         fig_dpi=150
     ):
     """
-    Plot the slide with each spot colored according to a specified set of values.
-
-    Parameters
-    ----------
-    df : DataFrame
-        A pandas DataFrame storing the coordinates for each spot.
-    values : ndarray
-        An N-length array of values, corresponding to the N spots, that should be
-        used to color each spot.
-    row_key : string, optional (default: 'row')
-        The name of the column in `adata.obs` storing the row coordinates
-        of each spot.
-    col_key : string, optional (default: 'col')
-        The name of the column in `adata.obs` storing the column
-        coordinates of each spot.
-    cmap : string, optional (default : 'viridis')
-        The colormap to use to color the spots. If the `values` array of values are
-        discrete categories, then one can supply the argument `categorical`.
-    cat_palette : , optional (default : None)
-        A palette (list) of colors to use for coloring categorical values. Only 
-        applied if `cmap` is set to 'categorical'. 
-    colorbar : boolean, optional (default : True)
-        If True, plot the colorbar next to the figure.
-    ticks : boolean (default: True)
-        If True, show tickmarks along x and y axes indicated spatial coordinates.
-    dsize : int (default : 37)
-        The size of the dots in the scatterplot.
-    title : string (default : None)
-        The plot title.
-    spot_borders : boolean (default : False)
-        If True, draw a border line around each spot.
-    border_color : string (default : 'black')
-        The color of the border line around each spot. Only used if `spot_borders`
-        is True.
-    border_size : float (default : 0.3)
-        The thickness of the border line around each spot. Only used if `spot_borders`
-        is True.
-
-    Returns
-    -------
-    None
-    """
-
-
-    """
     Create a grid of plots for displaying the correlations between pairs of genes across all spots. 
     That is, each spot in the grid displays the spot-specific correlation between a given pair of
     genes. 
@@ -1257,25 +1212,25 @@ def cluster_pairwise_correlations(
     plot_genes : list
         List of gene names or IDs. This function will consider the spot-specific 
         correlation for every pair of genes in this list.
-    color_thresh : float, optional (default : 19)
+    color_thresh : float, optional, default: 19
         The value along the y-axis of the dendrogram to use as a threshold for coloring
         the subclusters. The sub-dendrograms below this threshold will be given unique
         colors. The part of the dendrogram lying above this threshold will be colored
         grey.
-    row_key : string, optional (default: 'row')
+    row_key : string, optional, default: 'row'
         The name of the column in `adata.obs` storing the row coordinates of each spot.
-    col_key : string, optional (default: 'col')
+    col_key : string, optional, default: 'col'
         The name of the column in `adata.obs` storing the column coordinates of each 
         spot.
-    cond_key : string, optional (default : None)
+    cond_key : string, optional, default: None
         The name of the column in `adata.obs` storing the cluster assignments.
     fig_path : string, optional (default : None)
         The path to the file to which to save the figure.
-    fig_size : tuple, optional (default : (6,4))
+    fig_size : tuple, optional, default: (6,4)
         Figure height and width.
-    fig_format : string, optional (default : 'pdf')
+    fig_format : string, optional, default: 'pdf'
         File format to save figure.
-    fig_dpi : string, optional (default : 150)
+    fig_dpi : string, optional, default: 150
         Resolution of figure.
    
     Returns
