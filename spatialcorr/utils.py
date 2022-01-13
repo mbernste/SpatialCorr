@@ -37,18 +37,18 @@ def compute_local_correlation(
     kernel_matrix : ndarray
         An NxN matrix, where N is the number of spots, storing the value of the
         Guassian kernel for each pair of spots.
-    row_key : string, optional (default: 'row')
+    row_key : string, optional (default : 'row')
         The name of the column in `adata.obs` storing the row coordinates
         of each spot.
-    col_key : string, optional (default: 'col')
+    col_key : string, optional (default : 'col')
         The name of the column in `adata.obs` storing the column
         coordinates of each spot.
-    condition : string (default: None)
+    condition : string (default : None)
         The name of the column in `adata.obs` storing the histological region
         of each spot that should be conditioned on by the Gaussian kernel.
-    bandwidth : int
+    bandwidth : int, optional (int : 5)
         The kernel bandwidth used by the test.
-    contrib_thresh : integer, optional (default: 10)
+    contrib_thresh : integer, optional (default : 10)
         Threshold for the  total weight of all samples contributing
         to the correlation estimate at each spot. Spots with total
         weight less than this value will be filtered prior to running
@@ -59,7 +59,7 @@ def compute_local_correlation(
     corrs: ndarray
         An F-length array of correlation values storing the F spots kept 
         after applying the effective-neighbors kernel.
-    keep_inds:
+    keep_inds : ndarray
         An F-lenght array of the indices of the original `adata` object
         that were kept after applying the effective-neighbors kernel. The
         values in `corrs` correspond to these spots.
