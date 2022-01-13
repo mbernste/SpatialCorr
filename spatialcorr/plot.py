@@ -1161,12 +1161,6 @@ def cluster_pairwise_correlations(
 
     Parameters
     ----------
-    Plot the spots colored according to some specified values and, for a given spot,
-    plot the expression scatterplot between two genes in the neighborhood of the given
-    spot. Also draws an ordinary least squares regression line atop this scatterplot.
-
-    Parameters
-    ----------
     adata : AnnData
         Spatial gene expression dataset with spatial coordinates
         stored in `adata.obs`.
@@ -1200,7 +1194,6 @@ def cluster_pairwise_correlations(
     ------
     None
     """
-
     gene_pairs = []
     for g1_i, g1 in enumerate(plot_genes):
         for g2_i, g2 in enumerate(plot_genes):
