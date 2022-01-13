@@ -19,8 +19,12 @@ To install SpatialCorr using Pip, run the following command:
 
 `pip install spatialcorr`
 
-## Running SpatialCorr
+## Usage
+
+#### Documentation
 
 For SpatialCorr's API manual, please visit the [documentation](https://spatialcorr.readthedocs.io/en/latest/index.html).
 
-For a tutorial on running SpatialCorr, please see the [tutorial](https://github.com/mbernste/spatialcorr/blob/main/tutorial/SpatialCorr_tutorial.ipynb).
+#### Tutorial
+
+For a tutorial on running SpatialCorr, please see the [tutorial](https://github.com/mbernste/spatialcorr/blob/main/tutorial/SpatialCorr_tutorial.ipynb). This tutorial can also be run via [Google Colab]().
