@@ -64,6 +64,12 @@ Plotting functions
 
 .. autofunction:: spatialcorr.plot.cluster_pairwise_correlations
 
+.. raw:: html
+
+    <p align="center">
+    <img src="https://raw.githubusercontent.com/mbernste/spatialcorr/main/doc/_static/img/keratin_gene_corr_dendrogram.png"/>
+    </p>
+
 .. autofunction:: spatialcorr.plot.mult_genes_plot_correlation
 
 .. raw:: html
