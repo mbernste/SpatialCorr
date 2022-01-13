@@ -64,6 +64,14 @@ Plotting functions
 
 .. autofunction:: spatialcorr.plot.cluster_pairwise_correlations
 
+.. autofunction:: spatialcorr.plot.mult_genes_plot_correlation
+
+.. raw:: html
+
+    <p align="center">
+    <img src="https://raw.githubusercontent.com/mbernste/spatialcorr/main/doc/_static/img/keratin_gene_corr_heatmaps.png"/>
+    </p>
+
 .. autofunction:: spatialcorr.plot.plot_slide
 
 Utility functions

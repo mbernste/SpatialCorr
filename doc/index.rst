@@ -16,4 +16,9 @@ SpatialCorr -- Analyze spatial gene expression correlation in Python
 
 SpatialCorr is a set of statistical methods for identifying genes whose correlation structure changes across a spatial transcriptomics sample. Along with a set of statistical tests, SpatialCorr also offers a number of methods for visualizing spatially varying correlation.
 
+.. raw:: html
+
+    <p align="center">
+    <img src="https://raw.githubusercontent.com/mbernste/spatialcorr/main/imgs/Overview_MainFigure_V3-01.png"/>
+    </p>
 
