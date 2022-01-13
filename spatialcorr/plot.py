@@ -1217,20 +1217,20 @@ def cluster_pairwise_correlations(
         the subclusters. The sub-dendrograms below this threshold will be given unique
         colors. The part of the dendrogram lying above this threshold will be colored
         grey.
-    row_key : string, optional, default: 'row'
+    row_key : string, optional (default : 'row')
         The name of the column in `adata.obs` storing the row coordinates of each spot.
-    col_key : string, optional, default: 'col'
+    col_key : string, optional (default : 'col')
         The name of the column in `adata.obs` storing the column coordinates of each 
         spot.
-    cond_key : string, optional, default: None
+    cond_key : string, optional (default : None)
         The name of the column in `adata.obs` storing the cluster assignments.
     fig_path : string, optional (default : None)
         The path to the file to which to save the figure.
-    fig_size : tuple, optional, default: (6,4)
+    fig_size : tuple, optional (default : (6,4))
         Figure height and width.
-    fig_format : string, optional, default: 'pdf'
+    fig_format : string, optional (default : 'pdf')
         File format to save figure.
-    fig_dpi : string, optional, default: 150
+    fig_dpi : string, optional (default : 150)
         Resolution of figure.
    
     Returns
