@@ -4,7 +4,7 @@ API
 Wrapper functions
 -----------------
 
-The following wrapper function creates plots to diagnose the spatial kernel used in SpatialDC's statistical tests.
+The following wrapper function creates plots to diagnose the spatial kernel used in SpatialCorr's statistical tests.
 
 .. autofunction:: spatialcorr.kernel_diagnostics
 

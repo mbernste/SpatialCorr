@@ -318,7 +318,7 @@ def kernel_diagnostics(
         fformat='pdf',
         dpi=150
     ):
-    """Create plot to visualize the spatial kernel used for SpatialDC's statistical analyses.
+    """Create plot to visualize the spatial kernel used for SpatialCorr's statistical analyses.
 
     This function will plot the following analyses:
     Top left: The annotated regions/clusters
