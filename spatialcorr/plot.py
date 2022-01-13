@@ -165,28 +165,29 @@ def plot_correlation(
         The name or ID of the first gene.
     gene_2 : string 
         The name or ID of the second gene.
-    estimate : string (default : 'local')
+    estimate : string, optional (default : 'local')
         One of {'local', 'regional'}. The estimation method used to estimate the
         correlation at each spot. If 'local', use Gaussian kernel estimation. If 
         'regional', use all of the spots in the given spot's histological region.
-    bandwidth : int (default : 5)
+    kernel_matrix : ndarray, optional (default : None)
+        NxN matrix representing the spatial kernel (i.e., pairwise weights
+        between spatial locations). If not provided, one will be computed using
+        the `bandwidth` and `contrib_thresh` arguments.
+    bandwidth : int, optional  (default : 5)
         The kernel bandwidth used by the test. Only applied if `estimate` is set
-        to 'local'.
+        to 'local'. Only applied if `kernel_matrix` is not provided.
     contrib_thresh : integer, optional (default: 10)
         Threshold for the  total weight of all samples contributing
         to the correlation estimate at each spot. Spots with total
         weight less than this value will be filtered. Only applied if `estimate` 
-        is set to 'local'.
-    kernel_matrix : ndarray
-        NxN matrix representing the spatial kernel (i.e., pairwise weights
-        between spatial locations)
-    row_key : string, optional (default: 'row')
+        is set to 'local'. Only applied if `kernel_matrix` is not provided.
+    row_key : string, optional (default : 'row')
         The name of the column in `adata.obs` storing the row coordinates
         of each spot.
-    col_key : string, optional (default: 'col')
+    col_key : string, optional (default : 'col')
         The name of the column in `adata.obs` storing the column
         coordinates of each spot.
-    condition : string (default : None)
+    condition : string, optional (default : None)
         The name of the column in `adata.obs` storing the cluster
         assignments.
     cmap : string (default : 'RdBu_r')
@@ -968,14 +969,12 @@ def plot_neighborhood(
     return ax
 
 
-
-
 def mult_genes_plot_correlation(
         plot_genes,
         adata,
         cond_key,
         bandwidth=5,
-        precomputed_kernel=None,
+        kernel_matrix=None,
         contrib_thresh=10,
         estimate_type='local',
         row_key='row',
@@ -985,9 +984,102 @@ def mult_genes_plot_correlation(
         fig_format='png',
         fig_dpi=150
     ):
+    """
+    Plot the slide with each spot colored according to a specified set of values.
 
+    Parameters
+    ----------
+    df : DataFrame
+        A pandas DataFrame storing the coordinates for each spot.
+    values : ndarray
+        An N-length array of values, corresponding to the N spots, that should be
+        used to color each spot.
+    row_key : string, optional (default: 'row')
+        The name of the column in `adata.obs` storing the row coordinates
+        of each spot.
+    col_key : string, optional (default: 'col')
+        The name of the column in `adata.obs` storing the column
+        coordinates of each spot.
+    cmap : string, optional (default : 'viridis')
+        The colormap to use to color the spots. If the `values` array of values are
+        discrete categories, then one can supply the argument `categorical`.
+    cat_palette : , optional (default : None)
+        A palette (list) of colors to use for coloring categorical values. Only 
+        applied if `cmap` is set to 'categorical'. 
+    colorbar : boolean, optional (default : True)
+        If True, plot the colorbar next to the figure.
+    ticks : boolean (default: True)
+        If True, show tickmarks along x and y axes indicated spatial coordinates.
+    dsize : int (default : 37)
+        The size of the dots in the scatterplot.
+    title : string (default : None)
+        The plot title.
+    spot_borders : boolean (default : False)
+        If True, draw a border line around each spot.
+    border_color : string (default : 'black')
+        The color of the border line around each spot. Only used if `spot_borders`
+        is True.
+    border_size : float (default : 0.3)
+        The thickness of the border line around each spot. Only used if `spot_borders`
+        is True.
+
+    Returns
+    -------
+    None
+    """
+
+
+    """
+    Create a grid of plots for displaying the correlations between pairs of genes across all spots. 
+    That is, each spot in the grid displays the spot-specific correlation between a given pair of
+    genes. 
+
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial gene expression dataset with spatial coordinates
+        stored in `adata.obs`.
+    plot_genes : list
+        List of gene names or IDs. This function will consider the spot-specific 
+        correlation for every pair of genes in this list.
+    estimate : string, optional (default : 'local')
+        One of {'local', 'regional', 'local_ci'}. The estimation method used to estimate the
+        correlation at each spot. If 'local', use Gaussian kernel estimation. If
+        'regional', use all of the spots in the given spot's histological region. If 'local_ci'
+        is used, then each spot will be colored based on whether the 95% confidence interval
+        of the Gaussian kernel estimate overlaps zero.
+    kernel_matrix : ndarray, optional (default : None)
+        NxN matrix representing the spatial kernel (i.e., pairwise weights between spatial 
+        locations). If not provided, one will be computed using the `bandwidth` and 
+        `contrib_thresh`  arguments. Only applied if `estimate` is set to 'local' or 'local_ci'.
+    bandwidth : int, optional  (default : 5)
+        The kernel bandwidth used by the test. Only applied if `estimate` is set to 'local'. 
+        Only applied if `kernel_matrix` is not provided and `estimate` is set to 'local' or 
+        'local_ci'.
+    contrib_thresh : integer, optional (default: 10)
+        Threshold for the  total weight of all samples contributing to the correlation estimate 
+        at each spot. Spots with total weight less than this value will be filtered. Only applied 
+        if `estimate` is set to 'local'. Only applied if `kernel_matrix` is not provided and 
+        `estimate` is set to 'local' or 'local_ci'.
+    row_key : string, optional (default : 'row')
+        The name of the column in `adata.obs` storing the row coordinates of each spot.
+    col_key : string, optional (default : 'col')
+        The name of the column in `adata.obs` storing the column coordinates of each spot.
+    dsize : int, optional (default : 7)
+        The size of the dots in each plot.
+    fig_path :  string, optional (default : None)
+        Path to save figure as file.
+    fig_format : string, optional (default : 'pdf')
+        File format to save figure.
+    fig_dpi : string, optional (default : 150)
+        Resolution of figure.
+
+    Returns
+    -------
+    None
+    """
     condition = cond_key is not None
-    if precomputed_kernel is None:
+    if kernel_matrix is None:
         kernel_matrix = st.compute_kernel_matrix(
             adata.obs,
             bandwidth=bandwidth,
@@ -996,8 +1088,6 @@ def mult_genes_plot_correlation(
             y_col=row_key,
             x_col=col_key
         )
-    else:
-        kernel_matrix = precomputed_kernel
 
     # Select all genes that are in the data
     plot_genes = [
@@ -1154,10 +1244,10 @@ def cluster_pairwise_correlations(
         fig_dpi=150
     ):
     """
-    Cluster the patterns of correlations across all spots between pairs of 
-    genes. Plot a dendrogram of the clustering. Each leaf in the dendrogram
-    represents a single pair of genes. Two pairs will cluster together if their
-    pattern of correlation, across all of the spots, are similar.
+    Cluster the patterns of correlations across all spots between pairs of genes. Plot a 
+    dendrogram of the clustering. Each leaf in the dendrogram represents a single pair of 
+    genes. Two pairs will cluster together if their pattern of correlation, across all of 
+    the spots, are similar.
 
     Parameters
     ----------
@@ -1173,14 +1263,12 @@ def cluster_pairwise_correlations(
         colors. The part of the dendrogram lying above this threshold will be colored
         grey.
     row_key : string, optional (default: 'row')
-        The name of the column in `adata.obs` storing the row coordinates
-        of each spot.
+        The name of the column in `adata.obs` storing the row coordinates of each spot.
     col_key : string, optional (default: 'col')
-        The name of the column in `adata.obs` storing the column
-        coordinates of each spot.
+        The name of the column in `adata.obs` storing the column coordinates of each 
+        spot.
     cond_key : string, optional (default : None)
-        The name of the column in `adata.obs` storing the cluster
-        assignments.
+        The name of the column in `adata.obs` storing the cluster assignments.
     fig_path : string, optional (default : None)
         The path to the file to which to save the figure.
     fig_size : tuple, optional (default : (6,4))
@@ -1273,7 +1361,6 @@ def cluster_pairwise_correlations(
         ax.set_yticklabels([])
         ax.set_yticks([])
 
-
     plt.tight_layout()
     plt.show()
     if fig_path:
@@ -1284,6 +1371,7 @@ def cluster_pairwise_correlations(
             dpi=fig_dpi
         )
         plt.show()
+
 
 def plot_cluster_scatter(
         gene_1, 
