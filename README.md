@@ -1,6 +1,7 @@
 # SpatialCorr: Analyzing spatially varying correlation 
   
 ![PyPI Version](https://img.shields.io/pypi/v/spatialcorr)
+![Read the Docs](https://readthedocs.org/projects/spatialcorr/badge/?version=latest)
 
 ## About
 
