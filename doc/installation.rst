@@ -1,6 +1,6 @@
 Installation
 ============
 
-Install SpatialDC using pip with the following command::
+Install SpatialCorr using pip with the following command::
 
     pip install spatialcorr
