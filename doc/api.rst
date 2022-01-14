@@ -1,7 +1,7 @@
 API
 ===
 
-Pre-build pipelines
+Pre-built pipelines
 -------------------
 
 The following wrapper function creates plots to diagnose the spatial kernel used in SpatialCorr's statistical tests.
