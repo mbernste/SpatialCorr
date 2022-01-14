@@ -1052,13 +1052,13 @@ def plot_neighborhood(
 
 
 def mult_genes_plot_correlation(
-        plot_genes,
         adata,
+        plot_genes,
         cond_key,
+        estimate='local',
         bandwidth=5,
         kernel_matrix=None,
         contrib_thresh=10,
-        estimate_type='local',
         row_key='row',
         col_key='col',
         dsize=7,
@@ -1190,7 +1190,7 @@ def mult_genes_plot_correlation(
                 )
                 ax.set_ylabel(gene_1, fontsize=13)
             elif col > row:
-                if estimate_type in ['local', 'regional']:
+                if estimate in ['local', 'regional']:
                     corrs, kept_inds, _ = plot_correlation(
                         adata[keep_inds,:],
                         gene_1, gene_2,
@@ -1205,15 +1205,15 @@ def mult_genes_plot_correlation(
                         ticks=False,
                         ax=ax,
                         figure=None,
-                        estimate=estimate_type,
+                        estimate=estimate,
                         dsize=dsize,
                         title=title
                     )
-                elif estimate_type == 'local_ci':
+                elif estimate == 'local_ci':
                     plot_ci_overlap(
+                        adata,
                         gene_1,
                         gene_2,
-                        adata,
                         cond_key,
                         kernel_matrix=None,
                         bandwidth=bandwidth,
@@ -1265,9 +1265,9 @@ def _compute_pairwise_corrs(
     return all_corrs
 
 
-def cluster_pairwise_correlations( 
-        plot_genes,
+def cluster_pairwise_correlations(
         adata,
+        plot_genes,
         cond_key,
         bandwidth=5,
         row_key='row',

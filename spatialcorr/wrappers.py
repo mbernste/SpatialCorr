@@ -209,9 +209,9 @@ def analysis_pipeline_pair(
     else:
         ax = axarr[0][3]
     plot_ci_overlap(
+        adata,
         gene_1,
         gene_2,
-        adata,
         cond_key=cond_key,
         kernel_matrix=None,
         bandwidth=bandwidth,
