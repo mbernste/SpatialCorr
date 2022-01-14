@@ -115,6 +115,8 @@ Plotting
 Helper
 ------
 
+Low-level helper functions.
+
 .. autofunction:: spatialcorr.compute_local_correlation
 
 .. autofunction:: spatialcorr.most_significant_pairs
@@ -125,5 +127,7 @@ Helper
 
 Datasets
 --------
+
+Load pre-packaged datasets that have been pre-normalized and are ready to use with SpatialCorr.
 
 .. autofunction:: spatialcorr.load_dataset
