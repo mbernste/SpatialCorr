@@ -112,8 +112,8 @@ Plotting
 
 .. autofunction:: spatialcorr.plot.plot_slide
 
-Helper functions
------------------
+Helper
+------
 
 .. autofunction:: spatialcorr.compute_local_correlation
 
