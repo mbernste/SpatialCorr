@@ -56,7 +56,10 @@ def plot_filtered_spots(
         ax=None,
         figure=None,
         dsize=37,
-        ticks=True
+        ticks=True,
+        fig_path=None,
+        fig_format='pdf',
+        fig_dpi=150
     ):
     """
     Plot the slide with spots colored according to whether they would be filtered according
@@ -90,11 +93,25 @@ def plot_filtered_spots(
         The size of the dots in the scatterplot.
     ticks : boolean (default: True)
         If True, show tickmarks along x and y axes indicated spatial coordinates.
+    fig_path :  string, optional (default : None)
+        Path to save figure as file.
+    fig_format : string, optional (default : 'pdf')
+        File format to save figure.
+    fig_dpi : string, optional (default : 150)
+        Resolution of figure.
 
     Returns
     -------
     None
     """
+    if ax is None:
+        width = 5
+        figure, ax = plt.subplots(
+            1,
+            1,
+            figsize=(width,5)
+        )
+
     # Filter spots with too little contribution
     # from neighbors
     contrib = np.sum(kernel_matrix, axis=1)
@@ -130,6 +147,14 @@ def plot_filtered_spots(
         cat_palette=cat_palette
     )
 
+    if fig_path:
+        plt.tight_layout()
+        figure.savefig(
+            fig_path,
+            format=fig_format,
+            dpi=fig_dpi
+        )
+        plt.show()
 
 def plot_correlation(
         adata, 
@@ -151,7 +176,10 @@ def plot_correlation(
         title=None,
         spot_borders=False,
         border_color='black',
-        border_size=0.3
+        border_size=0.3,
+        fig_path=None,
+        fig_format='pdf',
+        fig_dpi=150
     ):
     """
     Plot the slide with each spot colored by the correlation between two genes.
@@ -210,11 +238,28 @@ def plot_correlation(
         is True.
     ticks : boolean (default: True)
         If True, show tickmarks along x and y axes indicated spatial coordinates.
+    fig_path :  string, optional (default : None)
+        Path to save figure as file.
+    fig_format : string, optional (default : 'pdf')
+        File format to save figure.
+    fig_dpi : string, optional (default : 150)
+        Resolution of figure.
 
     Returns
     -------
     None
     """
+    if ax is None:
+        if colorbar:
+            width = 7
+        else:
+            width = 5
+        figure, ax = plt.subplots(
+            1,
+            1,
+            figsize=(width,5)
+        )
+
     if estimate == 'local':
         corrs, keep_inds = _plot_correlation_local(
             adata,
@@ -259,14 +304,24 @@ def plot_correlation(
             border_size=border_size
         )
         extra_data={'region_to_corr': ct_to_corr}
+
+    if fig_path:
+        plt.tight_layout()
+        figure.savefig(
+            fig_path,
+            format=fig_format,
+            dpi=fig_dpi
+        )
+        plt.show()
+
     return corrs, keep_inds, extra_data
 
 
 def plot_ci_overlap(
+        adata,
         gene_1,
         gene_2, 
-        adata,
-        cond_key,
+        cond_key='cluster',
         kernel_matrix=None,
         bandwidth=5,
         row_key='row',
@@ -277,7 +332,10 @@ def plot_ci_overlap(
         ticks=False,
         dsize=12,
         colorticks=None,
-        neigh_thresh=10
+        neigh_thresh=10,
+        fig_path=None,
+        fig_format='pdf',
+        fig_dpi=150
     ):
     """
     Plot the spots and color each spot whether the 95% confidence interval of the Guassian estimate
@@ -320,11 +378,24 @@ def plot_ci_overlap(
         The size of the dots in the scatterplot.
     title : string (default : None)
         The plot title.
+    fig_path :  string, optional (default : None)
+        Path to save figure as file.
+    fig_format : string, optional (default : 'pdf')
+        File format to save figure.
+    fig_dpi : string, optional (default : 150)
+        Resolution of figure.
 
     Returns
     -------
     None
     """
+    if ax is None:
+        width = 5
+        figure, ax = plt.subplots(
+            1,
+            1,
+            figsize=(width,5)
+        )
 
     if kernel_matrix is None:
         kernel_matrix = st.compute_kernel_matrix(
@@ -387,6 +458,14 @@ def plot_ci_overlap(
         col_key=col_key
     )
 
+    if fig_path:
+        plt.tight_layout()
+        figure.savefig(
+            fig_path,
+            format=fig_format,
+            dpi=fig_dpi
+        )
+        plt.show()
 
 def plot_local_scatter(
         adata, 

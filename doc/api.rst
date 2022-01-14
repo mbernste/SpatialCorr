@@ -41,8 +41,8 @@ It outputs the following multi-panel figure:
     </p>
 
 
-Statistical tests
------------------
+Statistical
+-----------
 
 .. autofunction:: spatialcorr.run_test
 
@@ -56,9 +56,19 @@ Plotting
 
 .. autofunction:: spatialcorr.plot.plot_correlation
 
-.. autofunction:: spatialcorr.plot.plot_filtered_spots
+.. raw:: html
+
+    <p align="center">
+    <img src="https://raw.githubusercontent.com/mbernste/spatialcorr/main/doc/_static/img/KRT16_KRT6B_correlation.png"/>
+    </p>
 
 .. autofunction:: spatialcorr.plot.plot_ci_overlap
+
+.. raw:: html
+
+    <p align="center">
+    <img src="https://raw.githubusercontent.com/mbernste/spatialcorr/main/doc/_static/img/KRT16_KRT6B_correlation_ci.png"/>
+    </p>
 
 .. autofunction:: spatialcorr.plot.plot_local_scatter
 
@@ -76,6 +86,14 @@ Plotting
     <img src="https://raw.githubusercontent.com/mbernste/spatialcorr/main/doc/_static/img/KRT17_KRT6B_region_scatters.png"/>
     </p>
 
+.. autofunction:: spatialcorr.plot.mult_genes_plot_correlation
+
+.. raw:: html
+
+    <p align="center">
+    <img src="https://raw.githubusercontent.com/mbernste/spatialcorr/main/doc/_static/img/keratin_gene_corr_heatmaps.png"/>
+    </p>
+
 .. autofunction:: spatialcorr.plot.cluster_pairwise_correlations
 
 .. raw:: html
@@ -84,12 +102,12 @@ Plotting
     <img src="https://raw.githubusercontent.com/mbernste/spatialcorr/main/doc/_static/img/keratin_gene_corr_dendrogram.png"/>
     </p>
 
-.. autofunction:: spatialcorr.plot.mult_genes_plot_correlation
+.. autofunction:: spatialcorr.plot.plot_filtered_spots
 
 .. raw:: html
 
     <p align="center">
-    <img src="https://raw.githubusercontent.com/mbernste/spatialcorr/main/doc/_static/img/keratin_gene_corr_heatmaps.png"/>
+    <img src="https://raw.githubusercontent.com/mbernste/spatialcorr/main/doc/_static/img/filt_spots.png"/>
     </p>
 
 .. autofunction:: spatialcorr.plot.plot_slide
