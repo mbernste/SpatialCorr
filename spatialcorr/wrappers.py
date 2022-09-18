@@ -16,11 +16,11 @@ from .plot import plot_slide, plot_correlation, plot_ci_overlap, plot_filtered_s
 
 
 def analysis_pipeline_pair(
+        adata,
         gene_1, 
         gene_2,
-        adata,
-        bandwidth,
-        cond_key,
+        cond_key = 'cluster',
+        bandwidth = 5,
         row_key='row',
         col_key='col',
         reject_thresh=0.05,
@@ -280,8 +280,8 @@ def analysis_pipeline_pair(
         if p_val >= reject_thresh
     ]
     df_plot = pairwise_clust_between(
-        [gene_1, gene_2], 
-        adata, 
+        adata,
+        [gene_1, gene_2],
         cond_key, 
         run_regions=run_regions, 
         max_perms=max_perms,
@@ -308,8 +308,8 @@ def analysis_pipeline_pair(
 
 def kernel_diagnostics(
         adata,
-        cond_key,
-        bandwidth,
+        cond_key = 'cluster',
+        bandwidth = 5,
         contrib_thresh=10,
         row_key='row',
         col_key='col',
@@ -373,7 +373,7 @@ def kernel_diagnostics(
         adata.obs[cond_key],
         cmap='categorical',
         colorbar=True,
-        title=f'Clusters',
+        title=f'Cluster',
         ax=axarr[0][0],
         figure=None,
         ticks=False,
@@ -487,20 +487,20 @@ def kernel_diagnostics(
         fig.savefig(fpath, format=fformat, dpi=dpi)
 
 def analysis_pipeline_set(
-        genes,
         adata,
-        cond_key,
+        genes,
+        cond_key='cluster',
+        bandwidth=5,
+        max_perms=500,
         row_key='row',
         col_key='col',
         reject_thresh=0.05,
+        contrib_thresh=10,
         dsize=12,
-        bandwidth=5,
-        max_perms=500,
-        n_procs=5,
         run_br=False,
         spot_to_neighbors=None,
         spot_to_neighbors_clust=None,
-        contrib_thresh=10,
+        n_procs=5,
         verbose=1,
         fig_path=None,
         fig_format='pdf',
@@ -672,8 +672,8 @@ def analysis_pipeline_set(
     ]
 
     df_plot = pairwise_clust_between(
-        genes,
         adata,
+        genes,
         cond_key,
         run_regions=run_regions,
         max_perms=max_perms,
@@ -698,16 +698,16 @@ def analysis_pipeline_set(
 
 
 def pairwise_clust_between(
+        adata,
         genes, 
-        adata, 
-        cond_key, 
+        cond_key='cluster', 
         row_key='row', 
         col_key='col', 
+        contrib_thresh=10,
         max_perms=500,
         n_procs=5,
-        run_regions=None,
         verbose=1,
-        contrib_thresh=10
+        run_regions=None
     ):
     ct_to_ct_to_pval, ct_to_ct_to_adj_pval = run_test_between_region_pairs(
         adata,
