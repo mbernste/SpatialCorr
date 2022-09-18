@@ -32,6 +32,8 @@ def analysis_pipeline_pair(
         fig_path=None,
         fig_format='pdf',
         dpi=150,
+        cmap_expr='viridis',
+        cmap_corr='RdBu_r',
         only_stats=False
     ):
     """Run a SpatialCorr analysis pipeline on a pair of genes.
@@ -86,6 +88,10 @@ def analysis_pipeline_pair(
         Format of the output figure file.
     dpi: int (default: 150)
         Resolution of output image.
+    cmap_expr : String, optional (default 'turbo')
+        colormap for expression figures.
+    cmap_corr : String, optional (default 'RdBu_r')
+        colormap for correlation figures.
 
     Returns
     -------
@@ -114,7 +120,7 @@ def analysis_pipeline_pair(
         plot_slide(
             adata.obs,
             expr_1,
-            cmap='turbo',
+            cmap=cmap_expr,
             colorbar=False,
             vmin=min_expr,
             vmax=max_expr,
@@ -130,7 +136,7 @@ def analysis_pipeline_pair(
         plot_slide(
             adata.obs,
             expr_2,
-            cmap='turbo',
+            cmap=cmap_expr,
             colorbar=False,
             vmin=min_expr,
             vmax=max_expr,
@@ -194,7 +200,7 @@ def analysis_pipeline_pair(
         row_key=row_key,
         col_key=col_key,
         condition=cond_key,
-        cmap='RdBu_r',
+        cmap=cmap_corr,
         colorbar=False,
         ticks=False,
         ax=ax,

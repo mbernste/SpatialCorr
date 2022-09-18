@@ -1064,7 +1064,10 @@ def mult_genes_plot_correlation(
         dsize=7,
         fig_path=None,
         fig_format='png',
-        fig_dpi=150
+        fig_dpi=150,
+        cmap_expr='turbo',
+        cmap_corr='RdBu_r',
+        figsize_scale=1.0
     ):
     """
     Create a grid of plots for displaying the correlations between pairs of genes across all spots. 
@@ -1110,6 +1113,12 @@ def mult_genes_plot_correlation(
         File format to save figure.
     fig_dpi : string, optional (default : 150)
         Resolution of figure.
+    cmap_expr : String, optional (default 'turbo')
+        colormap for expression figures.
+    cmap_corr : String, optional (default 'RdBu_r')
+        colormap for correlation figures.
+    figsize_scale : float greater than 0, optional (default 1.0)
+        Increases or decreases the fgure size.
 
     Returns
     -------
@@ -1135,7 +1144,7 @@ def mult_genes_plot_correlation(
     fig, axarr = plt.subplots(
         len(plot_genes),
         len(plot_genes),
-        figsize=(2*len(plot_genes),2*len(plot_genes))
+        figsize=(2*len(plot_genes)*figsize_scale,2*len(plot_genes)*figsize_scale)
     )
 
     # Compute kept indices
@@ -1177,7 +1186,7 @@ def mult_genes_plot_correlation(
                 plot_slide(
                     adata[keep_inds,:].obs,
                     adata[keep_inds,:].obs_vector(gene_1),
-                    cmap='turbo',
+                    cmap=cmap_expr,
                     title=title,
                     dsize=dsize,
                     ax=ax,
@@ -1200,7 +1209,7 @@ def mult_genes_plot_correlation(
                         row_key=row_key,
                         col_key=col_key,
                         condition=cond_key,
-                        cmap='RdBu_r',
+                        cmap=cmap_corr,
                         colorbar=False,
                         ticks=False,
                         ax=ax,
