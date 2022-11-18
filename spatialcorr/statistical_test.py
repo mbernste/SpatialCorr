@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import math
 from collections import defaultdict
+import multiprocessing as mp
 from multiprocessing import Process, Manager
 from sklearn.metrics.pairwise import euclidean_distances
 from statsmodels.stats.multitest import multipletests
@@ -601,6 +602,11 @@ def _between_groups_test(
 
         # Sample statistic from null distribution
         if n_procs > 1: # Multi-processing
+            try:
+                mp.set_start_method('fork', force=True)
+            except RuntimeError:
+                print('err')
+                pass
 
             manager = Manager()
             t_nulls = manager.list()
@@ -1372,18 +1378,19 @@ def run_test_between_region_pairs(
    
 
 def est_corr_cis(
-        gene_1, 
-        gene_2, 
         adata,
-        bandwidth,
+        gene_1, 
+        gene_2,
         cond_key,
+        bandwidth,
         precomputed_kernel=None,
+        row_key='row',
+        col_key='col',
         confidence_interval=0.95,
         spot_to_neighs=None,
         neigh_thresh=10,
         n_boots=100,
-        row_key='row',
-        col_key='col'
+        
     ):
     """Compute approximate confidence intervals around the kernel estimates 
     of spot wise correlation.
