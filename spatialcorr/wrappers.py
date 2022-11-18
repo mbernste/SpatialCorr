@@ -16,11 +16,11 @@ from .plot import plot_slide, plot_correlation, plot_ci_overlap, plot_filtered_s
 
 
 def analysis_pipeline_pair(
+        adata,
         gene_1, 
         gene_2,
-        adata,
-        bandwidth,
-        cond_key,
+        cond_key = 'cluster',
+        bandwidth = 5,
         row_key='row',
         col_key='col',
         reject_thresh=0.05,
@@ -32,6 +32,8 @@ def analysis_pipeline_pair(
         fig_path=None,
         fig_format='pdf',
         dpi=150,
+        cmap_expr='viridis',
+        cmap_corr='RdBu_r',
         only_stats=False
     ):
     """Run a SpatialCorr analysis pipeline on a pair of genes.
@@ -86,6 +88,10 @@ def analysis_pipeline_pair(
         Format of the output figure file.
     dpi: int (default: 150)
         Resolution of output image.
+    cmap_expr : String, optional (default 'turbo')
+        colormap for expression figures.
+    cmap_corr : String, optional (default 'RdBu_r')
+        colormap for correlation figures.
 
     Returns
     -------
@@ -114,7 +120,7 @@ def analysis_pipeline_pair(
         plot_slide(
             adata.obs,
             expr_1,
-            cmap='turbo',
+            cmap=cmap_expr,
             colorbar=False,
             vmin=min_expr,
             vmax=max_expr,
@@ -130,7 +136,7 @@ def analysis_pipeline_pair(
         plot_slide(
             adata.obs,
             expr_2,
-            cmap='turbo',
+            cmap=cmap_expr,
             colorbar=False,
             vmin=min_expr,
             vmax=max_expr,
@@ -194,7 +200,7 @@ def analysis_pipeline_pair(
         row_key=row_key,
         col_key=col_key,
         condition=cond_key,
-        cmap='RdBu_r',
+        cmap=cmap_corr,
         colorbar=False,
         ticks=False,
         ax=ax,
@@ -280,8 +286,8 @@ def analysis_pipeline_pair(
         if p_val >= reject_thresh
     ]
     df_plot = pairwise_clust_between(
-        [gene_1, gene_2], 
-        adata, 
+        adata,
+        [gene_1, gene_2],
         cond_key, 
         run_regions=run_regions, 
         max_perms=max_perms,
@@ -308,8 +314,8 @@ def analysis_pipeline_pair(
 
 def kernel_diagnostics(
         adata,
-        cond_key,
-        bandwidth,
+        cond_key = 'cluster',
+        bandwidth = 5,
         contrib_thresh=10,
         row_key='row',
         col_key='col',
@@ -373,7 +379,7 @@ def kernel_diagnostics(
         adata.obs[cond_key],
         cmap='categorical',
         colorbar=True,
-        title=f'Clusters',
+        title=f'Cluster',
         ax=axarr[0][0],
         figure=None,
         ticks=False,
@@ -487,20 +493,20 @@ def kernel_diagnostics(
         fig.savefig(fpath, format=fformat, dpi=dpi)
 
 def analysis_pipeline_set(
-        genes,
         adata,
-        cond_key,
+        genes,
+        cond_key='cluster',
+        bandwidth=5,
+        max_perms=500,
         row_key='row',
         col_key='col',
         reject_thresh=0.05,
+        contrib_thresh=10,
         dsize=12,
-        bandwidth=5,
-        max_perms=500,
-        n_procs=5,
         run_br=False,
         spot_to_neighbors=None,
         spot_to_neighbors_clust=None,
-        contrib_thresh=10,
+        n_procs=5,
         verbose=1,
         fig_path=None,
         fig_format='pdf',
@@ -672,8 +678,8 @@ def analysis_pipeline_set(
     ]
 
     df_plot = pairwise_clust_between(
-        genes,
         adata,
+        genes,
         cond_key,
         run_regions=run_regions,
         max_perms=max_perms,
@@ -698,16 +704,16 @@ def analysis_pipeline_set(
 
 
 def pairwise_clust_between(
+        adata,
         genes, 
-        adata, 
-        cond_key, 
+        cond_key='cluster', 
         row_key='row', 
         col_key='col', 
+        contrib_thresh=10,
         max_perms=500,
         n_procs=5,
-        run_regions=None,
         verbose=1,
-        contrib_thresh=10
+        run_regions=None
     ):
     ct_to_ct_to_pval, ct_to_ct_to_adj_pval = run_test_between_region_pairs(
         adata,
