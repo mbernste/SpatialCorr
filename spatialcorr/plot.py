@@ -420,8 +420,8 @@ def plot_ci_overlap(
         col_key=col_key
     )
     cis, keep_inds = st.est_corr_cis(
-        adata,
         gene_1, gene_2,
+        adata,
         bandwidth=bandwidth,
         precomputed_kernel=kernel_matrix,
         cond_key=cond_key,
@@ -1054,7 +1054,7 @@ def plot_neighborhood(
 def mult_genes_plot_correlation(
         adata,
         plot_genes,
-        cond_key='cluster',
+        cond_key,
         estimate='local',
         bandwidth=5,
         kernel_matrix=None,
@@ -1064,10 +1064,7 @@ def mult_genes_plot_correlation(
         dsize=7,
         fig_path=None,
         fig_format='png',
-        fig_dpi=150,
-        cmap_expr='turbo',
-        cmap_corr='RdBu_r',
-        figsize_scale=1.0
+        fig_dpi=150
     ):
     """
     Create a grid of plots for displaying the correlations between pairs of genes across all spots. 
@@ -1113,12 +1110,6 @@ def mult_genes_plot_correlation(
         File format to save figure.
     fig_dpi : string, optional (default : 150)
         Resolution of figure.
-    cmap_expr : String, optional (default 'turbo')
-        colormap for expression figures.
-    cmap_corr : String, optional (default 'RdBu_r')
-        colormap for correlation figures.
-    figsize_scale : float greater than 0, optional (default 1.0)
-        Increases or decreases the fgure size.
 
     Returns
     -------
@@ -1144,7 +1135,7 @@ def mult_genes_plot_correlation(
     fig, axarr = plt.subplots(
         len(plot_genes),
         len(plot_genes),
-        figsize=(2*len(plot_genes)*figsize_scale,2*len(plot_genes)*figsize_scale)
+        figsize=(2*len(plot_genes),2*len(plot_genes))
     )
 
     # Compute kept indices
@@ -1186,7 +1177,7 @@ def mult_genes_plot_correlation(
                 plot_slide(
                     adata[keep_inds,:].obs,
                     adata[keep_inds,:].obs_vector(gene_1),
-                    cmap=cmap_expr,
+                    cmap='turbo',
                     title=title,
                     dsize=dsize,
                     ax=ax,
@@ -1209,7 +1200,7 @@ def mult_genes_plot_correlation(
                         row_key=row_key,
                         col_key=col_key,
                         condition=cond_key,
-                        cmap=cmap_corr,
+                        cmap='RdBu_r',
                         colorbar=False,
                         ticks=False,
                         ax=ax,
@@ -1250,8 +1241,8 @@ def mult_genes_plot_correlation(
 
 
 def _compute_pairwise_corrs(
-        adata,
-        gene_pairs,  
+        gene_pairs, 
+        adata, 
         cond_key, 
         bandwidth=5, 
         row_key='row', 
@@ -1340,8 +1331,8 @@ def cluster_pairwise_correlations(
     ]
 
     all_corrs = _compute_pairwise_corrs(
-        adata,
         gene_pairs,
+        adata,
         cond_key,
         bandwidth=5,
         row_key='row',
@@ -1420,9 +1411,9 @@ def cluster_pairwise_correlations(
 
 
 def plot_cluster_scatter(
-        adata,
         gene_1, 
-        gene_2,  
+        gene_2, 
+        adata, 
         cond_key,
         clust, 
         col_vals=None, 
@@ -1452,8 +1443,8 @@ def plot_cluster_scatter(
             'color': col_vals[ct_to_inds[clust]]
         }
         sns.regplot(
-            x = expr_1, 
-            y = expr_2, 
+            expr_1, 
+            expr_2, 
             scatter_kws=scatter_kws, 
             line_kws=line_kws, 
             ax=ax
@@ -1467,14 +1458,14 @@ def plot_cluster_scatter(
             'color': color
         }
         sns.regplot(
-            x = expr_1, 
-            y = expr_2, 
+            expr_1, 
+            expr_2, 
             scatter_kws=scatter_kws, 
             line_kws=line_kws, 
             ax=ax
         ) 
     else:
-        sns.regplot(x = expr_1, y = expr_2)#, s=4)
+        sns.regplot(expr_1, expr_2)#, s=4)
 
     if xlabel:
         ax.set_xlabel(xlabel)
@@ -1488,10 +1479,10 @@ def plot_cluster_scatter(
 
 
 def region_scatterplots(
-        adata,
         gene_1,
         gene_2,
-        cond_key='cluster',
+        adata,
+        cond_key,
         row_key='row',
         col_key='col',
         xlim=None,
@@ -1566,9 +1557,9 @@ def region_scatterplots(
             xlabel = f'{gene_1} Expression'
 
         plot_cluster_scatter(
-            adata,
             gene_1, 
             gene_2, 
+            adata, 
             cond_key,
             ct,
             ax=ax,
