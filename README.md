@@ -12,7 +12,7 @@ Here is a schematic overview of the analyses performed by SpatialCorr:
 ![alt text](https://raw.githubusercontent.com/mbernste/spatialcorr/main/imgs/Overview_MainFigure_V3-01.png)
 
 For more details regarding the underlying method, see the paper:  
-[Bernstein, M.N., Ni, Z., Prasad, A., Brown, J., Mohanty, C., Stewart, R., Newton, M.A., Kendziorski, C. (2022). SpatialCorr: Identifying gene sets with spatially varying correlation structure. *bioRxiv*.](https://www.biorxiv.org/content/10.1101/2022.02.04.479191v1)
+[Bernstein, M.N., Ni, Z., Prasad, A., Brown, J., Mohanty, C., Stewart, R., Newton, M.A., Kendziorski, C. (2022). SpatialCorr: Identifying gene sets with spatially varying correlation structure. *Cell Reports Methods*.](https://doi.org/10.1016/j.crmeth.2022.100369)
 
 ## Installation
 
