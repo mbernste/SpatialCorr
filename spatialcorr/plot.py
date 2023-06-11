@@ -666,9 +666,9 @@ def plot_local_scatter(
             ax=ax,
             scatter_kws={
                 'color': line_color,
-                'cmap': 'viridis_r',
-                'vmin': 0,
-                'vmax': 1
+                # 'cmap': 'viridis_r',
+                # 'vmin': 0,
+                # 'vmax': 1
             },
             line_kws={
                 "color": line_color

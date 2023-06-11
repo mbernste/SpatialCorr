@@ -16,12 +16,12 @@ install_requires = [
 if sys.version_info[:2] < (3, 7):
     raise RuntimeError("Python version >=3.7 required.")
 
-with open("README.rst", "r", encoding="utf-8") as fh:
+with open("README.md", "r", encoding="utf-8") as fh:
     readme = fh.read()
 
 setup(
     name="spatialcorr",
-    version="1.0.0",
+    version="1.2.0",
     description="SpatialCorr",
     author="Matthew N. Bernstein",
     author_email="mbernstein@morgridge.org",
@@ -31,6 +31,7 @@ setup(
     license="MIT License",
     install_requires=install_requires,
     long_description=readme,
+    package_data={'spatialcorr':['datasets/GSM4284326_P10_ST_rep2.h5ad']},
     include_package_data=True,
     zip_safe=True,
     url="https://github.com/mbernste/spatialcorr",
